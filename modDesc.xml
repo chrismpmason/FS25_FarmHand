@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<modDesc descVersion="98">
+    <author>Chris Mason</author>
+    <version>0.1.0.0</version>
+
+    <title>
+        <en>FarmHand</en>
+    </title>
+
+    <description>
+        <en><![CDATA[Hire farm hands and grow them into a capable workforce.
+
+New hands start near-useless: they wear equipment hard and can only handle basic
+tasks. Two separate paths make them better. Experience builds automatically from
+the work they do and steadily reduces the wear, fuel and time they cost you.
+Formal on-the-job courses unlock what they are allowed to do at all — a hand
+cannot touch the sprayer until he has earned his pesticides certificate.
+
+Wages are paid every month, and a well-trained hand who is underpaid may walk.
+Decide who is worth keeping.]]></en>
+    </description>
+
+    <iconFilename>icon_FarmHand.dds</iconFilename>
+
+    <multiplayer supported="true"/>
+
+    <extraSourceFiles>
+        <sourceFile filename="scripts/FarmHand.lua"/>
+    </extraSourceFiles>
+</modDesc>

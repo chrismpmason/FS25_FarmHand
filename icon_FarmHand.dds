@@ -1,0 +1,4 @@
+PLACEHOLDER ICON — replace before release.
+
+This file is a stand-in so modDesc.xml resolves during early development.
+Replace it with a real 256x256 DDS (DXT5) icon. Do not ship this text file.
