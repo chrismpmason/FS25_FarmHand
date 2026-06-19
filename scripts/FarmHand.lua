@@ -19,10 +19,11 @@ FarmHand.MOD_NAME = g_currentModName
 FarmHand.MOD_DIRECTORY = g_currentModDirectory
 FarmHand.VERSION = "0.1.0.0"
 
--- Pull in the rest of the mod. Order matters: settings and worker model are
+-- Pull in the rest of the mod. Order matters: settings and the worker model are
 -- needed before the manager that uses them.
 local sourceFiles = {
     "scripts/FarmHandSettings.lua",
+    "scripts/FarmHandWorker.lua",
     "scripts/FarmHandManager.lua",
 }
 

@@ -106,3 +106,44 @@ The first working slice should implement, end to end:
 
 Everything else (full course catalogue, fuel/speed modifiers, richer retention,
 additional settings) comes after this slice works.
+
+---
+
+## Implementation notes (verified against the FS25 script API)
+
+These were confirmed from the real API (working mods + the FS25 script source),
+not assumed. The base game scripts ship encrypted, so verification was done
+against shipping mods and public script mirrors.
+
+### Worker assignment model (Option A, lightweight)
+
+The game's "Hire assistant" spawns an anonymous helper; the AI job only learns
+which helper it is inside `start()` (`self.helperIndex = helper.index`), **not**
+at validation time. So the gate cannot ask the job "whose certificate?". Instead
+the mod keeps a single **active hand** (`FarmHandManager:getActiveHand()`), and
+the gate checks that hand. Proper per-vehicle hand selection is a later slice.
+
+### Pesticides gate
+
+- **Hook:** overwrite `AIJobFieldWork:validate(farmId)`, which returns
+  `(isValid, errorMessage)`. Call the original; if still valid, apply the check
+  and, to block, return `false, "<reason>"` — the UI shows that string.
+- **Scope decision: gate the activity, not the machine.** The `Sprayer`
+  specialization (work-area type `SPRAYER`) is shared by herbicide sprayers,
+  liquid-fertilizer sprayers, granular fertilizer spreaders and lime spreaders.
+  The pesticides certificate gates **only herbicide application** — detected by
+  the implement's current spray type being `SprayType.HERBICIDE`
+  (`g_sprayTypeManager`). Fertilizing, liquid fertilizing and liming stay open
+  and can get their own certificates later. Mechanical weeders and salt
+  spreaders are separate work-area types and are unaffected.
+
+### Confirmed API surface
+
+- Month tick: `g_messageCenter:subscribe(MessageType.PERIOD_CHANGED, ...)`.
+- Named-helper roster: `g_helperManager` (`addHelper`, `getHelperByName`,
+  `availableHelpers`), `g_currentMission.maxNumHirables`.
+- Per-vehicle AI worker context: `AIFieldWorker` spec, `updateAIFieldWorker`,
+  `self.spec_aiFieldWorker`, `self:getIsFieldWorkActive()` (for later wear/speed).
+- Spray types: `g_sprayTypeManager.sprayTypes[SprayType.HERBICIDE | FERTILIZER |
+  LIQUIDFERTILIZER | LIME]`.
+- Hooking idiom: `Utils.overwrittenFunction / appendedFunction / prependedFunction`.

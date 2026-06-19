@@ -3,11 +3,13 @@
 --
 -- Central owner of the mod's state and the month-tick orchestrator.
 --
--- Holds the candidate pool and the roster of employed workers, and runs the
--- ordered month rollover described in DESIGN.md. Everything here is currently
--- a scaffold of clearly-marked stubs; the first feature slice will fill these
--- in (pesticides certificate gating, the experience-to-wear curve, on-the-job
--- month-tick training, monthly wages, and a basic leave-risk).
+-- Holds the candidate pool, the roster of employed workers, and the "active
+-- hand" (the worker the lightweight Option-A model treats as the one being put
+-- on a job). Runs the ordered month rollover described in DESIGN.md.
+--
+-- The month-tick steps are currently clearly-marked stubs; the first feature
+-- slice will fill them in (pesticides certificate gating, the experience-to-
+-- wear curve, on-the-job month-tick training, monthly wages, basic leave-risk).
 --
 
 FarmHandManager = {}
@@ -27,8 +29,11 @@ function FarmHandManager.new(modDirectory, modName)
 
     -- Hire pool: candidates available this month.
     self.candidates = {}
-    -- Employed workers, keyed however the first slice decides (id -> worker).
+    -- Employed workers, keyed by worker id (id -> FarmHandWorker).
     self.workers = {}
+    -- The worker currently treated as "the one being assigned" (Option A).
+    -- The certificate gate will check this worker. nil = no hand selected.
+    self.activeHandId = nil
 
     return self
 end
@@ -37,14 +42,67 @@ end
 -- Will eventually restore persisted state and seed the first candidate pool.
 function FarmHandManager:load()
     self.settings:load()
+
     -- TODO(slice 1): restore saved workers/candidates, or seed an initial pool.
+
+    -- TEMPORARY test scaffolding (no hiring UI yet): two hands so the gate can
+    -- be exercised once it exists. One is certified for pesticides, one is not;
+    -- the uncertified hand is made active so the default state demonstrates a
+    -- block. Remove once real hiring lands.
+    local certified = FarmHandWorker.new("test_certified", "Alan Carter")
+    certified:grantCertificate(FarmHandCertificate.PESTICIDES)
+    self:addWorker(certified)
+
+    local rookie = FarmHandWorker.new("test_rookie", "Tom Hale")
+    self:addWorker(rookie)
+
+    self:setActiveHand(rookie.id)
 end
 
 --- Release anything held for the current game.
 function FarmHandManager:delete()
-    -- TODO(slice 1): unsubscribe / drop references as state is added.
     self.candidates = {}
     self.workers = {}
+    self.activeHandId = nil
+end
+
+-- =========================================================================
+-- Worker roster + active hand.
+-- =========================================================================
+
+--- Add a worker to the employed roster, keyed by his id.
+function FarmHandManager:addWorker(worker)
+    self.workers[worker.id] = worker
+end
+
+--- Look up an employed worker by id, or nil if not employed.
+function FarmHandManager:getWorker(id)
+    return self.workers[id]
+end
+
+--- Set the active hand by id. Only succeeds for an employed worker.
+-- @return true if set, false if no such worker
+function FarmHandManager:setActiveHand(id)
+    if self.workers[id] == nil then
+        return false
+    end
+
+    self.activeHandId = id
+    return true
+end
+
+--- The active hand worker object, or nil if none is set / he is gone.
+function FarmHandManager:getActiveHand()
+    if self.activeHandId == nil then
+        return nil
+    end
+
+    return self.workers[self.activeHandId]
+end
+
+--- Clear the active hand selection.
+function FarmHandManager:clearActiveHand()
+    self.activeHandId = nil
 end
 
 -- =========================================================================
