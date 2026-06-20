@@ -117,6 +117,17 @@ function FarmHand:onPeriodChanged()
     end
 end
 
+--- Persist the roster when the game saves. Appended to the savegame writer;
+--- `missionInfo.savegameDirectory` is the current savegame folder.
+function FarmHand.onSaveToXMLFile(missionInfo, ...)
+    if FarmHand.manager == nil or missionInfo == nil or missionInfo.savegameDirectory == nil then
+        return
+    end
+
+    local path = missionInfo.savegameDirectory .. "/FS25_FarmHand.xml"
+    FarmHand.manager:saveToXMLFile(path)
+end
+
 local function init()
     -- Lifecycle hooks into the base mission.
     Mission00.load = Utils.appendedFunction(Mission00.load, function(mission, ...)
@@ -129,6 +140,11 @@ local function init()
 
     -- The month rollover is the mod's heartbeat.
     g_messageCenter:subscribe(MessageType.PERIOD_CHANGED, FarmHand.onPeriodChanged, FarmHand)
+
+    -- Persist the roster into the savegame whenever the game saves.
+    if FSCareerMissionInfo ~= nil then
+        FSCareerMissionInfo.saveToXMLFile = Utils.appendedFunction(FSCareerMissionInfo.saveToXMLFile, FarmHand.onSaveToXMLFile)
+    end
 
     print(string.format("FarmHand %s loaded.", FarmHand.VERSION))
 end

@@ -63,6 +63,17 @@ function FarmHandsDialog.show()
     dialog.hands = manager ~= nil and manager:getWorkersList() or {}
     if dialog.handList ~= nil then
         dialog.handList:reloadData()
+
+        -- Put the list selection (the green highlight) on the active hand's row
+        -- instead of defaulting to row 0.
+        local activeIndex = 1
+        for i, hand in ipairs(dialog.hands) do
+            if manager ~= nil and hand.id == manager.activeHandId then
+                activeIndex = i
+                break
+            end
+        end
+        dialog.handList:setSelectedItem(1, activeIndex)
     end
 
     g_gui:showDialog("FarmHandsDialog")
@@ -116,6 +127,16 @@ function FarmHandsDialog:populateCellForItemInSection(list, section, index, cell
     if activeEl ~= nil then
         activeEl:setText(isActive and g_i18n:getText("farmhand_ui_active") or "")
     end
+
+    -- Dim inactive rows so the active hand reads at a glance. Set both branches
+    -- every populate (cells are reused on reload, so colours must be refreshed).
+    if isActive then
+        if nameEl ~= nil then nameEl:setTextColor(1, 1, 1, 1) end
+        if certsEl ~= nil then certsEl:setTextColor(0.85, 0.85, 0.85, 1) end
+    else
+        if nameEl ~= nil then nameEl:setTextColor(0.5, 0.5, 0.5, 1) end
+        if certsEl ~= nil then certsEl:setTextColor(0.5, 0.5, 0.5, 1) end
+    end
 end
 
 -- ---- Interaction -----------------------------------------------------------
@@ -134,6 +155,8 @@ function FarmHandsDialog:onClickHand(item)
     end
 
     self.handList:reloadData()
+    -- Keep the green selection on the row just made active (reload can reset it).
+    self.handList:setSelectedItem(1, index)
 end
 
 function FarmHandsDialog:onListSelectionChanged(list, section, index)

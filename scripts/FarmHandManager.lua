@@ -44,18 +44,24 @@ function FarmHandManager.new(modDirectory, modName)
     return self
 end
 
---- Bring the manager online for a loaded savegame.
--- Will eventually restore persisted state and seed the first candidate pool.
+--- Bring the manager online for a loaded savegame. Restore persisted state if a
+--- save file exists; otherwise seed the default roster (new game).
 function FarmHandManager:load()
     self.settings:load()
 
-    -- TODO(slice 1): restore saved workers/candidates, or seed an initial pool.
+    local loaded = self:loadFromXMLFile(self:getSavePath())
+    if loaded ~= nil then
+        return
+    end
 
-    -- TEMPORARY test scaffolding (no hiring/enrolment UI yet). Two hands:
-    --   * Alan Carter - already certified for pesticides (the control).
-    --   * Tom Hale    - enrolled on the 3-month pesticides course (the subject).
-    -- The active hand defaults to the first added (Alan); use the Farm Hands
-    -- panel (default key K) to switch. Remove once real hiring lands.
+    self:seedDefaultRoster()
+end
+
+--- Seed the default roster for a brand-new game (no save yet). TEMPORARY test
+--- scaffolding until real hiring lands:
+---   * Alan Carter - certified veteran (control).
+---   * Tom Hale    - green, enrolled on the 3-month pesticides course (subject).
+function FarmHandManager:seedDefaultRoster()
     local certified = FarmHandWorker.new("test_certified", "Alan Carter")
     certified:grantCertificate(FarmHandCertificate.PESTICIDES)
     certified.hectaresWorked = 500 -- veteran: wear multiplier ~0.9x
@@ -73,6 +79,114 @@ function FarmHandManager:delete()
     self.workers = {}
     self.workerOrder = {}
     self.activeHandId = nil
+end
+
+-- =========================================================================
+-- Savegame persistence.
+-- =========================================================================
+
+--- Path to our XML inside the current savegame folder, or nil if unavailable.
+function FarmHandManager:getSavePath()
+    local missionInfo = g_currentMission ~= nil and g_currentMission.missionInfo or nil
+    if missionInfo == nil or missionInfo.savegameDirectory == nil then
+        return nil
+    end
+    return missionInfo.savegameDirectory .. "/FS25_FarmHand.xml"
+end
+
+--- Write the roster + active hand to the savegame. Returns the count saved.
+function FarmHandManager:saveToXMLFile(path)
+    if path == nil then
+        return 0
+    end
+
+    local xmlFile = XMLFile.create("farmHandXML", path, "farmHand")
+    if xmlFile == nil then
+        return 0
+    end
+
+    local key = "farmHand"
+    xmlFile:setString(key .. "#activeHandId", self.activeHandId or "")
+
+    local workers = self:getWorkersList()
+    xmlFile:setTable(key .. ".workers.worker", workers, function(workerKey, worker)
+        xmlFile:setString(workerKey .. "#id", worker.id)
+        xmlFile:setString(workerKey .. "#name", worker.name)
+        xmlFile:setFloat(workerKey .. "#hectaresWorked", worker.hectaresWorked or 0)
+        xmlFile:setInt(workerKey .. "#baseWage", worker.baseWage or 2000)
+
+        -- Active-hand flag, stored per-worker (root attributes read back
+        -- unreliably; per-element attributes like this are dependable).
+        if worker.id == self.activeHandId then
+            xmlFile:setBool(workerKey .. "#active", true)
+        end
+
+        -- Certificates as a space-separated list of ids.
+        local certs = {}
+        for certId in pairs(worker.certificates) do
+            certs[#certs + 1] = certId
+        end
+        xmlFile:setString(workerKey .. "#certificates", table.concat(certs, " "))
+
+        if worker:isEnrolled() then
+            xmlFile:setString(workerKey .. ".course#targetCert", worker.targetCert)
+            xmlFile:setInt(workerKey .. ".course#progress", worker.courseProgress or 0)
+            xmlFile:setInt(workerKey .. ".course#length", worker.courseLength or 0)
+        end
+    end)
+
+    xmlFile:save()
+    xmlFile:delete()
+    return #workers
+end
+
+--- Load the roster + active hand from the savegame. Returns the count loaded,
+--- or nil if there is no save file (caller should then seed a new game).
+function FarmHandManager:loadFromXMLFile(path)
+    if path == nil then
+        return nil
+    end
+
+    local xmlFile = XMLFile.loadIfExists("farmHandXML", path)
+    if xmlFile == nil then
+        return nil
+    end
+
+    local key = "farmHand"
+
+    xmlFile:iterate(key .. ".workers.worker", function(_, workerKey)
+        local id = xmlFile:getString(workerKey .. "#id", nil)
+        if id ~= nil then
+            local worker = FarmHandWorker.new(id, xmlFile:getString(workerKey .. "#name", "Hand"))
+            worker.hectaresWorked = xmlFile:getFloat(workerKey .. "#hectaresWorked", 0)
+            worker.baseWage = xmlFile:getInt(workerKey .. "#baseWage", 2000)
+
+            local certStr = xmlFile:getString(workerKey .. "#certificates", "")
+            for certId in string.gmatch(certStr, "%S+") do
+                worker:grantCertificate(certId)
+            end
+
+            if xmlFile:hasProperty(workerKey .. ".course") then
+                local targetCert = xmlFile:getString(workerKey .. ".course#targetCert", nil)
+                if targetCert ~= nil then
+                    worker:enrollCourse(targetCert, xmlFile:getInt(workerKey .. ".course#length", 1))
+                    worker.courseProgress = xmlFile:getInt(workerKey .. ".course#progress", 0)
+                end
+            end
+
+            self:addWorker(worker)
+
+            -- Restore the active hand from the per-worker flag (overrides the
+            -- default-to-first-added that addWorker applies).
+            if xmlFile:getBool(workerKey .. "#active", false) then
+                self.activeHandId = worker.id
+            end
+        end
+    end)
+
+    xmlFile:delete()
+
+    return #self:getWorkersList()
 end
 
 -- =========================================================================
