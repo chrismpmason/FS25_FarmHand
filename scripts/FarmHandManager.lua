@@ -47,17 +47,18 @@ function FarmHandManager:load()
 
     -- TODO(slice 1): restore saved workers/candidates, or seed an initial pool.
 
-    -- TEMPORARY test scaffolding (no hiring UI yet): two hands so the gate and
-    -- the Farm Hands panel can be exercised. One is certified for pesticides,
-    -- one is not. The active hand defaults to the first added (Alan, certified);
-    -- use the Farm Hands panel (default key K) to switch. Remove once real
-    -- hiring lands.
+    -- TEMPORARY test scaffolding (no hiring/enrolment UI yet). Two hands:
+    --   * Alan Carter - already certified for pesticides (the control).
+    --   * Tom Hale    - enrolled on the 3-month pesticides course (the subject).
+    -- The active hand defaults to the first added (Alan); use the Farm Hands
+    -- panel (default key K) to switch. Remove once real hiring lands.
     local certified = FarmHandWorker.new("test_certified", "Alan Carter")
     certified:grantCertificate(FarmHandCertificate.PESTICIDES)
     self:addWorker(certified)
 
     local rookie = FarmHandWorker.new("test_rookie", "Tom Hale")
     self:addWorker(rookie)
+    self:enrollCourse(rookie, FarmHandCertificate.PESTICIDES, 3)
 end
 
 --- Release anything held for the current game.
@@ -128,6 +129,18 @@ function FarmHandManager:clearActiveHand()
 end
 
 -- =========================================================================
+-- Courses / on-the-job training.
+-- =========================================================================
+
+--- Enroll a worker on a course for a certificate. Required months is the base
+--- length scaled by the player's course-duration multiplier (min 1).
+function FarmHandManager:enrollCourse(worker, targetCert, baseMonths)
+    local multiplier = self.settings:getCourseDurationMultiplier()
+    local length = math.max(1, math.floor(baseMonths * multiplier + 0.5))
+    worker:enrollCourse(targetCert, length)
+end
+
+-- =========================================================================
 -- Month rollover. Steps run in the order defined in DESIGN.md section 4.
 -- =========================================================================
 
@@ -141,11 +154,21 @@ function FarmHandManager:onMonthChanged()
     self:resetMonthlyCounters()
 end
 
---- 1. Advance each in-training worker by one month, but only if he worked
---- during the month just ended. Idle months do not count.
+--- 1. Advance each enrolled worker's course by one month and grant the
+--- certificate on completion.
+--- DEFERRED: the "only counts if he actually worked this month" condition
+--- arrives with the experience/wear slice that adds work detection.
 function FarmHandManager:advanceCourses()
-    -- TODO(slice 1): pesticides certificate progresses one month per worked month,
-    -- scaled by settings:getCourseDurationMultiplier().
+    for _, worker in pairs(self.workers) do
+        if worker:isEnrolled() then
+            worker.courseProgress = worker.courseProgress + 1
+
+            if worker.courseProgress >= worker.courseLength then
+                worker:grantCertificate(worker.targetCert)
+                worker:clearCourse()
+            end
+        end
+    end
 end
 
 --- 2. Fold the hectares worked this month into each worker's experience value
