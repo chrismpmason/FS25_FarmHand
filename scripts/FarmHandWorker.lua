@@ -62,6 +62,17 @@ function FarmHandWorker:revokeCertificate(certificateId)
     self.certificates[certificateId] = nil
 end
 
+--- Equipment-wear multiplier driven by accumulated experience (hectares).
+--- Front-loaded exponential decay from `green` (at 0 ha) toward `floor`:
+---   multiplier = floor + (green - floor) * exp(-hectaresWorked / k)
+--- Params come from settings; defaults make the method usable standalone.
+function FarmHandWorker:getWearMultiplier(floor, green, k)
+    floor = floor or 0.9
+    green = green or 1.75
+    k = k or 100
+    return floor + (green - floor) * math.exp(-self.hectaresWorked / k)
+end
+
 --- Number of certificates the worker currently holds.
 function FarmHandWorker:getCertificateCount()
     local count = 0

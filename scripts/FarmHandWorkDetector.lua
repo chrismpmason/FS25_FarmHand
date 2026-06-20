@@ -117,6 +117,9 @@ local function onUpdateAIFieldWorker(self, dt)
     -- Attribution: accumulate the delta and flag the month worked.
     hand.hectaresWorked = hand.hectaresWorked + deltaHa
     hand.workedThisMonth = true
+
+    -- Apply the experience-to-wear curve to this combination's machinery.
+    FarmHandWear.applyToCombination(self, hand, manager.settings)
 end
 
 --- Install the hook. Idempotent.

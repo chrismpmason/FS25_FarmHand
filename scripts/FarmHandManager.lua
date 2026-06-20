@@ -58,9 +58,11 @@ function FarmHandManager:load()
     -- panel (default key K) to switch. Remove once real hiring lands.
     local certified = FarmHandWorker.new("test_certified", "Alan Carter")
     certified:grantCertificate(FarmHandCertificate.PESTICIDES)
+    certified.hectaresWorked = 500 -- veteran: wear multiplier ~0.9x
     self:addWorker(certified)
 
     local rookie = FarmHandWorker.new("test_rookie", "Tom Hale")
+    rookie.hectaresWorked = 0 -- green: wear multiplier ~1.75x
     self:addWorker(rookie)
     self:enrollCourse(rookie, FarmHandCertificate.PESTICIDES, 3)
 end

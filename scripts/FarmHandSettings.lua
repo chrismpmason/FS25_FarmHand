@@ -17,9 +17,14 @@ function FarmHandSettings.new()
     -- Scales how many in-game months a course takes. 1.0 = design default.
     self.courseDurationMultiplier = 1.0
 
-    -- Reserved for later slices (kept here so the save format is stable).
     self.wageMultiplier = 1.0
-    self.wearCurveStrength = 1.0
+
+    -- Experience-to-wear curve: multiplier = floor + (green - floor) * exp(-ha / K).
+    self.wearFloor = 0.9   -- veteran (many hectares): easiest on machinery
+    self.wearGreen = 1.75  -- green (zero hectares): hardest on machinery
+    self.wearK = 100       -- hectares constant; lower = faster early improvement
+
+    -- Reserved for later slices (kept here so the save format is stable).
     self.experienceGainRate = 1.0
     self.leaveRiskStrength = 1.0
 
@@ -42,4 +47,16 @@ end
 
 function FarmHandSettings:getWageMultiplier()
     return self.wageMultiplier
+end
+
+function FarmHandSettings:getWearFloor()
+    return self.wearFloor
+end
+
+function FarmHandSettings:getWearGreen()
+    return self.wearGreen
+end
+
+function FarmHandSettings:getWearK()
+    return self.wearK
 end
