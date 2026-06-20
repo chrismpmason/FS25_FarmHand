@@ -39,6 +39,11 @@ function FarmHandWorker.new(id, name)
     self.courseProgress = nil  -- months completed so far
     self.courseLength = nil    -- months required to complete
 
+    -- Work accumulation. Foundation the wear curve, specialisation gains and
+    -- the deferred "course month only counts if he worked" condition read from.
+    self.hectaresWorked = 0      -- lifetime hectares attributed to this hand
+    self.workedThisMonth = false -- set when any work is attributed; reset monthly
+
     return self
 end
 

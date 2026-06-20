@@ -230,8 +230,10 @@ function FarmHandManager:refreshCandidates()
     -- TODO(slice 1): generate names, low starting experience, wage, signing cost.
 end
 
---- Clear per-month accumulators (e.g. hectares-worked-this-month, worked flag)
---- ready for the new month.
+--- Clear per-month accumulators (the worked-this-month flag) ready for the new
+--- month. Runs last in onMonthChanged, after the steps that read the flag.
 function FarmHandManager:resetMonthlyCounters()
-    -- TODO(slice 1): reset per-worker monthly tallies.
+    for _, worker in pairs(self.workers) do
+        worker.workedThisMonth = false
+    end
 end

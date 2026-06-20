@@ -26,6 +26,7 @@ local sourceFiles = {
     "scripts/FarmHandWorker.lua",
     "scripts/FarmHandManager.lua",
     "scripts/FarmHandGate.lua",
+    "scripts/FarmHandWorkDetector.lua",
     "scripts/gui/FarmHandsDialog.lua",
 }
 
