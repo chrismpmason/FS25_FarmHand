@@ -131,9 +131,10 @@ the gate checks that hand. Proper per-vehicle hand selection is a later slice.
 - **Scope decision: gate the activity, not the machine.** The `Sprayer`
   specialization (work-area type `SPRAYER`) is shared by herbicide sprayers,
   liquid-fertilizer sprayers, granular fertilizer spreaders and lime spreaders.
-  The pesticides certificate gates **only herbicide application** — detected by
-  the implement's current spray type being `SprayType.HERBICIDE`
-  (`g_sprayTypeManager`). Fertilizing, liquid fertilizing and liming stay open
+  The pesticides certificate gates **only herbicide application** — detected
+  from the sprayer tank's current **fill type** (see below), mapped to a
+  spray-type descriptor whose `.isHerbicide` is true. Fertilizing, liquid
+  fertilizing and liming stay open
   and can get their own certificates later. Mechanical weeders and salt
   spreaders are separate work-area types and are unaffected.
 
@@ -146,4 +147,15 @@ the gate checks that hand. Proper per-vehicle hand selection is a later slice.
   `self.spec_aiFieldWorker`, `self:getIsFieldWorkActive()` (for later wear/speed).
 - Spray types: `g_sprayTypeManager.sprayTypes[SprayType.HERBICIDE | FERTILIZER |
   LIQUIDFERTILIZER | LIME]`.
+- Vehicle from a job: `self.vehicleParameter:getVehicle()` (inside validate).
+- Reaching the sprayer: `vehicle:getAttachedImplements()` (entries have
+  `.object`; recurse for the whole combination), plus the vehicle itself for
+  self-propelled sprayers.
+- Spray type from tank contents (works at validate time, unlike
+  `getActiveSprayType()` which is nil until the job is actually working): read
+  the sprayer's fill unit via
+  `getFillUnitLastValidFillType(getSprayerFillUnitIndex())` (fall back to
+  `getFillUnitFirstSupportedFillType` when the tank is empty), then
+  `g_sprayTypeManager:getSprayTypeByFillTypeIndex(fillType)` → descriptor with
+  `.index` and `.isHerbicide`.
 - Hooking idiom: `Utils.overwrittenFunction / appendedFunction / prependedFunction`.

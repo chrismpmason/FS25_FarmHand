@@ -25,6 +25,7 @@ local sourceFiles = {
     "scripts/FarmHandSettings.lua",
     "scripts/FarmHandWorker.lua",
     "scripts/FarmHandManager.lua",
+    "scripts/FarmHandGate.lua",
 }
 
 for _, file in ipairs(sourceFiles) do
@@ -40,6 +41,11 @@ FarmHand.manager = nil
 function FarmHand:onMissionLoad(mission)
     FarmHand.manager = FarmHandManager.new(FarmHand.MOD_DIRECTORY, FarmHand.MOD_NAME)
     FarmHand.manager:load()
+
+    -- Install task-permission gates here rather than at script load: the AI job
+    -- and field-worker classes are reliably defined by the time a mission loads.
+    -- FarmHandGate.install() is guarded so it only wraps the base functions once.
+    FarmHandGate.install()
 end
 
 --- Tear the manager down when the mission ends so a fresh game starts clean.
@@ -71,6 +77,8 @@ local function init()
 
     -- The month rollover is the mod's heartbeat.
     g_messageCenter:subscribe(MessageType.PERIOD_CHANGED, FarmHand.onPeriodChanged, FarmHand)
+
+    print(string.format("FarmHand %s loaded.", FarmHand.VERSION))
 end
 
 init()
