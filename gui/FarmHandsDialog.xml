@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8" standalone="no" ?>
+<GUI onOpen="onOpen" onClose="onClose" onCreate="onCreate">
+    <GuiElement profile="newLayer"/>
+    <Bitmap profile="dialogFullscreenBg" id="dialogBg"/>
+
+    <GuiElement profile="farmHands_dialogBg" id="dialogElement">
+        <ThreePartBitmap profile="fs25_dialogBgMiddle"/>
+        <ThreePartBitmap profile="fs25_dialogBgTop"/>
+        <ThreePartBitmap profile="fs25_dialogBgBottom"/>
+
+        <GuiElement profile="fs25_dialogContentContainer">
+
+            <Text profile="farmHands_title" text="$l10n_farmhand_ui_title"/>
+
+            <GuiElement profile="farmHands_listContainer" id="handContainer">
+                <SmoothList profile="fs25_animalTargetList" id="handList" startClipperElementName="startClipper" endClipperElementName="endClipper">
+                    <ListItem profile="farmHands_listItem" onClick="onClickHand">
+                        <Bitmap profile="farmHands_listItemBg" name="alternating"/>
+                        <Text profile="farmHands_cellName" name="name"/>
+                        <Text profile="farmHands_cellCerts" name="certs"/>
+                        <Text profile="farmHands_cellActive" name="active"/>
+                    </ListItem>
+                </SmoothList>
+                <Bitmap profile="fs25_secondaryMenuStartClipper" name="startClipper"/>
+                <Bitmap profile="fs25_secondaryMenuStopClipper" name="endClipper"/>
+                <ThreePartBitmap profile="fs25_subCategoryListSliderBox" position="20px 0px">
+                    <Slider profile="fs25_animalTargetListSlider" id="handSlider" dataElementId="handList"/>
+                </ThreePartBitmap>
+            </GuiElement>
+
+        </GuiElement>
+
+        <BoxLayout profile="fs25_dialogButtonBox">
+            <Button profile="buttonBack" text="$l10n_button_back" onClick="onClickBack" id="backButton"/>
+        </BoxLayout>
+    </GuiElement>
+
+    <GUIProfiles>
+        <!-- Centered, structured dialog box (built-in fs25_dialogBg handles the centering). -->
+        <Profile name="farmHands_dialogBg" extends="fs25_dialogBg">
+            <width value="860px"/>
+            <height value="720px"/>
+        </Profile>
+
+        <Profile name="farmHands_title" extends="fs25_textDefault" with="anchorTopLeft pivotTopLeft">
+            <position value="40px -30px"/>
+            <textSize value="28px"/>
+            <textBold value="true"/>
+        </Profile>
+
+        <!-- List viewport: stretches across the content container with a fixed height. -->
+        <Profile name="farmHands_listContainer" extends="emptyPanel" with="anchorTopStretchingX pivotTopLeft">
+            <position value="0px -80px"/>
+            <absoluteSizeOffset value="80px 520px"/>
+        </Profile>
+
+        <!-- Row: MUST stretch across the list (anchorTopStretchingX) with a height,
+             otherwise it collapses to zero size and the populated cells are invisible. -->
+        <Profile name="farmHands_listItem" extends="emptyPanel" with="anchorTopStretchingX pivotTopLeft">
+            <height value="60px"/>
+        </Profile>
+
+        <Profile name="farmHands_listItemBg" extends="baseReference" with="anchorStretchingYStretchingX">
+            <imageSliceId value="gui.3dShop_button_middle"/>
+            <imageColor value="$preset_fs25_colorGreyListItem"/>
+            <imageSelectedColor value="$preset_fs25_colorMainHighlight"/>
+        </Profile>
+
+        <Profile name="farmHands_cellName" extends="fs25_textDefault" with="anchorMiddleLeft">
+            <width value="300px"/>
+            <position value="20px 0px"/>
+        </Profile>
+
+        <Profile name="farmHands_cellCerts" extends="fs25_textDefault" with="anchorMiddleLeft">
+            <width value="320px"/>
+            <position value="340px 0px"/>
+        </Profile>
+
+        <Profile name="farmHands_cellActive" extends="fs25_textDefault" with="anchorMiddleRight">
+            <width value="180px"/>
+            <position value="-20px 0px"/>
+            <textAlignment value="right"/>
+        </Profile>
+    </GUIProfiles>
+</GUI>

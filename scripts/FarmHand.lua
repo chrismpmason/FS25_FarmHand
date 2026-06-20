@@ -26,6 +26,7 @@ local sourceFiles = {
     "scripts/FarmHandWorker.lua",
     "scripts/FarmHandManager.lua",
     "scripts/FarmHandGate.lua",
+    "scripts/gui/FarmHandsDialog.lua",
 }
 
 for _, file in ipairs(sourceFiles) do
@@ -34,6 +35,9 @@ end
 
 -- The live manager instance for the loaded savegame, or nil between games.
 FarmHand.manager = nil
+
+-- Whether the open-panel input hook has been installed (install-once guard).
+FarmHand.inputHookInstalled = false
 
 --- Create the manager when a mission starts loading.
 -- Appended to Mission00.load so it runs for every savegame, single- or
@@ -46,6 +50,52 @@ function FarmHand:onMissionLoad(mission)
     -- and field-worker classes are reliably defined by the time a mission loads.
     -- FarmHandGate.install() is guarded so it only wraps the base functions once.
     FarmHandGate.install()
+
+    -- Load the Farm Hands panel GUI (guarded so it only loads once).
+    FarmHandsDialog.register()
+
+    -- Bind the open-panel key. Done here (not at script load) because the
+    -- player input component class is reliably defined by mission load.
+    FarmHand.installInputHook()
+end
+
+--- Install the open-panel key hook once. Appends to the player's action-event
+--- registration so FARMHAND_OPEN is bound for the local player.
+function FarmHand.installInputHook()
+    if FarmHand.inputHookInstalled then
+        return
+    end
+
+    if PlayerInputComponent == nil or PlayerInputComponent.registerActionEvents == nil then
+        return
+    end
+
+    PlayerInputComponent.registerActionEvents = Utils.appendedFunction(
+        PlayerInputComponent.registerActionEvents, FarmHand.onRegisterPlayerActionEvents)
+    FarmHand.inputHookInstalled = true
+end
+
+--- Register the open-panel key for the local player.
+-- Appended to the player's action-event registration, so the FARMHAND_OPEN
+-- action is bound in the on-foot context. (In-vehicle binding can follow.)
+function FarmHand.onRegisterPlayerActionEvents(playerInputComponent)
+    if playerInputComponent.player == nil or not playerInputComponent.player.isOwner then
+        return
+    end
+
+    g_inputBinding:beginActionEventsModification(PlayerInputComponent.INPUT_CONTEXT_NAME)
+    local _, eventId = g_inputBinding:registerActionEvent(InputAction.FARMHAND_OPEN, FarmHand, FarmHand.onOpenFarmHands, false, true, false, true)
+    g_inputBinding:endActionEventsModification()
+
+    if eventId ~= nil then
+        g_inputBinding:setActionEventText(eventId, g_i18n:getText("input_FARMHAND_OPEN"))
+        g_inputBinding:setActionEventTextVisibility(eventId, true)
+    end
+end
+
+--- Open-panel action callback.
+function FarmHand.onOpenFarmHands(self, actionName, inputValue)
+    FarmHandsDialog.show()
 end
 
 --- Tear the manager down when the mission ends so a fresh game starts clean.

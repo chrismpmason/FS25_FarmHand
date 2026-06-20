@@ -31,6 +31,8 @@ function FarmHandManager.new(modDirectory, modName)
     self.candidates = {}
     -- Employed workers, keyed by worker id (id -> FarmHandWorker).
     self.workers = {}
+    -- Stable display order for the roster (workers itself is keyed by id).
+    self.workerOrder = {}
     -- The worker currently treated as "the one being assigned" (Option A).
     -- The certificate gate will check this worker. nil = no hand selected.
     self.activeHandId = nil
@@ -45,24 +47,24 @@ function FarmHandManager:load()
 
     -- TODO(slice 1): restore saved workers/candidates, or seed an initial pool.
 
-    -- TEMPORARY test scaffolding (no hiring UI yet): two hands so the gate can
-    -- be exercised once it exists. One is certified for pesticides, one is not;
-    -- the uncertified hand is made active so the default state demonstrates a
-    -- block. Remove once real hiring lands.
+    -- TEMPORARY test scaffolding (no hiring UI yet): two hands so the gate and
+    -- the Farm Hands panel can be exercised. One is certified for pesticides,
+    -- one is not. The active hand defaults to the first added (Alan, certified);
+    -- use the Farm Hands panel (default key K) to switch. Remove once real
+    -- hiring lands.
     local certified = FarmHandWorker.new("test_certified", "Alan Carter")
     certified:grantCertificate(FarmHandCertificate.PESTICIDES)
     self:addWorker(certified)
 
     local rookie = FarmHandWorker.new("test_rookie", "Tom Hale")
     self:addWorker(rookie)
-
-    self:setActiveHand(rookie.id)
 end
 
 --- Release anything held for the current game.
 function FarmHandManager:delete()
     self.candidates = {}
     self.workers = {}
+    self.workerOrder = {}
     self.activeHandId = nil
 end
 
@@ -72,12 +74,32 @@ end
 
 --- Add a worker to the employed roster, keyed by his id.
 function FarmHandManager:addWorker(worker)
+    if self.workers[worker.id] == nil then
+        self.workerOrder[#self.workerOrder + 1] = worker.id
+    end
     self.workers[worker.id] = worker
+
+    -- Default the active hand to the first one added, until the player picks.
+    if self.activeHandId == nil then
+        self.activeHandId = worker.id
+    end
 end
 
 --- Look up an employed worker by id, or nil if not employed.
 function FarmHandManager:getWorker(id)
     return self.workers[id]
+end
+
+--- Employed workers in stable display order.
+function FarmHandManager:getWorkersList()
+    local list = {}
+    for _, id in ipairs(self.workerOrder) do
+        local worker = self.workers[id]
+        if worker ~= nil then
+            list[#list + 1] = worker
+        end
+    end
+    return list
 end
 
 --- Set the active hand by id. Only succeeds for an employed worker.

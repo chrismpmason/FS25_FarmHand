@@ -27,4 +27,29 @@ Decide who is worth keeping.]]></en>
     <extraSourceFiles>
         <sourceFile filename="scripts/FarmHand.lua"/>
     </extraSourceFiles>
+
+    <actions>
+        <action name="FARMHAND_OPEN" axisType="HALF"/>
+    </actions>
+
+    <inputBinding>
+        <actionBinding action="FARMHAND_OPEN">
+            <binding device="KB_MOUSE_DEFAULT" input="KEY_k"/>
+        </actionBinding>
+    </inputBinding>
+
+    <l10n>
+        <text name="farmhand_ui_title">
+            <en>Farm Hands</en>
+        </text>
+        <text name="farmhand_ui_certs_none">
+            <en>No certificates</en>
+        </text>
+        <text name="farmhand_ui_active">
+            <en>[ACTIVE]</en>
+        </text>
+        <text name="input_FARMHAND_OPEN">
+            <en>Farm Hands panel</en>
+        </text>
+    </l10n>
 </modDesc>
