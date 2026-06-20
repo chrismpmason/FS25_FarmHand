@@ -14,6 +14,10 @@
 
 FarmHandManager = {}
 
+-- Per-certificate monthly wage premium added on top of a hand's base wage
+-- (first-pass placeholder for balancing).
+FarmHandManager.CERT_WAGE_PREMIUM = 500
+
 local FarmHandManager_mt = Class(FarmHandManager)
 
 --- Construct a manager. Does not touch game state yet; see load().
@@ -141,6 +145,16 @@ function FarmHandManager:enrollCourse(worker, targetCert, baseMonths)
 end
 
 -- =========================================================================
+-- Wages.
+-- =========================================================================
+
+--- A single hand's monthly wage: base plus a premium per certificate held.
+--- (Experience scaling comes with the experience/wear slice.)
+function FarmHandManager:getWorkerMonthlyWage(worker)
+    return worker.baseWage + worker:getCertificateCount() * FarmHandManager.CERT_WAGE_PREMIUM
+end
+
+-- =========================================================================
 -- Month rollover. Steps run in the order defined in DESIGN.md section 4.
 -- =========================================================================
 
@@ -178,9 +192,31 @@ function FarmHandManager:tallyExperience()
     -- wear curve (~1.75x green down toward ~0.9x experienced).
 end
 
---- 3. Pay every employed worker's monthly wage from the farm account.
+--- 3. Pay every employed worker's monthly wage from the farm account. The
+--- total across ALL roster hands is scaled by the wage multiplier and deducted
+--- once (negative money change = expense).
 function FarmHandManager:payWages()
-    -- TODO(slice 1): debit farm for sum of monthly wages.
+    local total = 0
+    for _, worker in pairs(self.workers) do
+        total = total + self:getWorkerMonthlyWage(worker)
+    end
+
+    total = math.floor(total * self.settings:getWageMultiplier() + 0.5)
+    if total <= 0 then
+        return
+    end
+
+    local farmId = g_currentMission ~= nil and g_currentMission:getFarmId() or nil
+    local farm = farmId ~= nil and g_farmManager:getFarmById(farmId) or nil
+    if farm == nil then
+        return
+    end
+
+    -- Crib of Employment's monthly salary deduction: record the change for the
+    -- finance stats, then move the farm balance.
+    local moneyType = MoneyType.WAGES or MoneyType.OTHER
+    g_currentMission:addMoneyChange(-total, farm:getId(), moneyType, true)
+    farm:changeBalance(-total, moneyType)
 end
 
 --- 4. For each worker, roll the leave-risk. Underpaid valuable workers may

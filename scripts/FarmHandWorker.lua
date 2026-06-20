@@ -31,6 +31,9 @@ function FarmHandWorker.new(id, name)
     -- Held qualifications, as a set: certificateId -> true.
     self.certificates = {}
 
+    -- Base monthly wage before any per-certificate premium (first-pass default).
+    self.baseWage = 2000
+
     -- Active course (all nil when not enrolled). See enrollCourse().
     self.targetCert = nil      -- certificate this course grants on completion
     self.courseProgress = nil  -- months completed so far
@@ -52,6 +55,15 @@ end
 --- Remove a certificate.
 function FarmHandWorker:revokeCertificate(certificateId)
     self.certificates[certificateId] = nil
+end
+
+--- Number of certificates the worker currently holds.
+function FarmHandWorker:getCertificateCount()
+    local count = 0
+    for _ in pairs(self.certificates) do
+        count = count + 1
+    end
+    return count
 end
 
 -- ---- Course / on-the-job training ------------------------------------------

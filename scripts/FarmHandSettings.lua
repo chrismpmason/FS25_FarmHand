@@ -39,3 +39,7 @@ end
 function FarmHandSettings:getCourseDurationMultiplier()
     return self.courseDurationMultiplier
 end
+
+function FarmHandSettings:getWageMultiplier()
+    return self.wageMultiplier
+end
