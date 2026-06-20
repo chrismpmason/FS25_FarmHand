@@ -20,7 +20,7 @@ See [DESIGN.md](DESIGN.md) for the full behaviour specification.
 
 ```
 modDesc.xml              FS25 mod manifest
-icon_FarmHand.dds        mod icon (placeholder — see below)
+icon_FarmHand.dds        mod icon (256x256 DXT5 DDS)
 scripts/
   FarmHand.lua           entry point: load order + lifecycle + month tick
   FarmHandManager.lua    state owner + month-rollover orchestration
@@ -30,9 +30,8 @@ DESIGN.md                behaviour specification (source of truth)
 
 ## Icon
 
-`icon_FarmHand.dds` is currently a **placeholder** and must be replaced with a
-real icon before release: a **256x256 DDS** (DXT5). Author it as a PNG and
-convert with the GIANTS texture tool, or any DDS exporter.
+`icon_FarmHand.dds` is the mod icon: a **256x256 DDS** (DXT5). To change it,
+author a PNG and convert with the GIANTS texture tool, or any DDS exporter.
 
 ## Status
 
