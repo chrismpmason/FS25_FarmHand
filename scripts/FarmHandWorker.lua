@@ -82,6 +82,30 @@ function FarmHandWorker:getCertificateCount()
     return count
 end
 
+-- ---- Synthetic market value (leave-risk) -----------------------------------
+
+--- Experience factor in [0,1): 0 when green, approaching 1 with hectares.
+function FarmHandWorker:experienceFactor(k)
+    k = k or 150
+    return 1 - math.exp(-self.hectaresWorked / k)
+end
+
+--- What the open market would pay this hand: base plus a per-cert bonus and an
+--- experience bonus. Params come from settings; defaults keep it standalone.
+function FarmHandWorker:getMarketWage(certBonus, expBonus, expK)
+    certBonus = certBonus or 800
+    expBonus = expBonus or 1500
+    return self.baseWage
+        + certBonus * self:getCertificateCount()
+        + expBonus * self:experienceFactor(expK)
+end
+
+--- How far the hand's market wage exceeds what the farm actually pays them
+--- (>= 0). Green/uncertified hands sit near 0; trained ones open a gap.
+function FarmHandWorker:getPayGap(paidWage, certBonus, expBonus, expK)
+    return math.max(0, self:getMarketWage(certBonus, expBonus, expK) - (paidWage or 0))
+end
+
 -- ---- Course / on-the-job training ------------------------------------------
 
 --- Enroll the worker on a course for a certificate, resetting progress.

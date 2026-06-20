@@ -134,6 +134,30 @@ function FarmHandManager:clearActiveHand()
     self.activeHandId = nil
 end
 
+--- Remove a worker from the roster (e.g. on quitting). Clears any in-progress
+--- course (progress is lost) and reassigns the active hand if it was them.
+function FarmHandManager:removeWorker(id)
+    local worker = self.workers[id]
+    if worker == nil then
+        return
+    end
+
+    worker:clearCourse()
+    self.workers[id] = nil
+
+    for i, wid in ipairs(self.workerOrder) do
+        if wid == id then
+            table.remove(self.workerOrder, i)
+            break
+        end
+    end
+
+    -- If the active hand just left, fall back to the next one (or nil).
+    if self.activeHandId == id then
+        self.activeHandId = self.workerOrder[1]
+    end
+end
+
 -- =========================================================================
 -- Courses / on-the-job training.
 -- =========================================================================
@@ -221,10 +245,37 @@ function FarmHandManager:payWages()
     farm:changeBalance(-total, moneyType)
 end
 
---- 4. For each worker, roll the leave-risk. Underpaid valuable workers may
---- leave; a worker leaving mid-course loses his course progress.
+--- 4. For each worker, roll the leave-risk. The more a hand's market wage
+--- exceeds what the farm pays them, the likelier they quit. A hand who quits
+--- mid-course loses their in-progress course progress.
 function FarmHandManager:runRetentionCheck()
-    -- TODO(slice 1): basic leave-risk roll.
+    local settings = self.settings
+    local sensitivity = settings:getRetentionSensitivity()
+    local maxChance = settings:getMaxMonthlyQuitChance()
+    local certBonus = settings:getMarketCertBonus()
+    local expBonus = settings:getMarketExpBonus()
+    local expK = settings:getMarketExpK()
+
+    -- Collect quitters first; don't mutate the roster while iterating it.
+    local quitters = {}
+    for id, worker in pairs(self.workers) do
+        local paidWage = self:getWorkerMonthlyWage(worker)
+        local marketWage = worker:getMarketWage(certBonus, expBonus, expK)
+        local gap = worker:getPayGap(paidWage, certBonus, expBonus, expK)
+
+        local quitChance = 0
+        if marketWage > 0 then
+            quitChance = math.min(maxChance, math.max(0, sensitivity * gap / marketWage))
+        end
+
+        if math.random() < quitChance then
+            quitters[#quitters + 1] = id
+        end
+    end
+
+    for _, id in ipairs(quitters) do
+        self:removeWorker(id)
+    end
 end
 
 --- 5. Replace the hire pool with a freshly generated set of candidates.
