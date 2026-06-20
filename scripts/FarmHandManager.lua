@@ -171,12 +171,12 @@ function FarmHandManager:onMonthChanged()
 end
 
 --- 1. Advance each enrolled worker's course by one month and grant the
---- certificate on completion.
---- DEFERRED: the "only counts if he actually worked this month" condition
---- arrives with the experience/wear slice that adds work detection.
+--- certificate on completion. A month only counts if the hand actually worked
+--- it: we read workedThisMonth for the month just ended (resetMonthlyCounters,
+--- the last step of onMonthChanged, clears it afterwards for the new month).
 function FarmHandManager:advanceCourses()
     for _, worker in pairs(self.workers) do
-        if worker:isEnrolled() then
+        if worker:isEnrolled() and worker.workedThisMonth then
             worker.courseProgress = worker.courseProgress + 1
 
             if worker.courseProgress >= worker.courseLength then
