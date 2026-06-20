@@ -44,6 +44,15 @@ function FarmHandWorker.new(id, name)
     self.hectaresWorked = 0      -- lifetime hectares attributed to this hand
     self.workedThisMonth = false -- set when any work is attributed; reset monthly
 
+    -- Driver identity. styleSlot = which vanilla helper's appearance to borrow
+    -- (PERSISTED, so the face is stable across reloads). helperIndex = the index
+    -- of our per-hand registered helper (RUNTIME only, re-derived each load).
+    -- isMale picks the gender pool to borrow from (PERSISTED); defaults male
+    -- until proper gender selection arrives at hire.
+    self.styleSlot = nil
+    self.helperIndex = nil
+    self.isMale = true
+
     return self
 end
 

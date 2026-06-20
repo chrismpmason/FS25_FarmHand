@@ -50,11 +50,12 @@ function FarmHandManager:load()
     self.settings:load()
 
     local loaded = self:loadFromXMLFile(self:getSavePath())
-    if loaded ~= nil then
-        return
+    if loaded == nil then
+        self:seedDefaultRoster()
     end
 
-    self:seedDefaultRoster()
+    -- Register a per-hand helper (driver appearance + name) for the whole roster.
+    self:registerHelpersForRoster()
 end
 
 --- Seed the default roster for a brand-new game (no save yet). TEMPORARY test
@@ -65,10 +66,12 @@ function FarmHandManager:seedDefaultRoster()
     local certified = FarmHandWorker.new("test_certified", "Alan Carter")
     certified:grantCertificate(FarmHandCertificate.PESTICIDES)
     certified.hectaresWorked = 500 -- veteran: wear multiplier ~0.9x
+    certified.isMale = true
     self:addWorker(certified)
 
     local rookie = FarmHandWorker.new("test_rookie", "Tom Hale")
     rookie.hectaresWorked = 0 -- green: wear multiplier ~1.75x
+    rookie.isMale = true
     self:addWorker(rookie)
     self:enrollCourse(rookie, FarmHandCertificate.PESTICIDES, 3)
 end
@@ -115,6 +118,12 @@ function FarmHandManager:saveToXMLFile(path)
         xmlFile:setFloat(workerKey .. "#hectaresWorked", worker.hectaresWorked or 0)
         xmlFile:setInt(workerKey .. "#baseWage", worker.baseWage or 2000)
 
+        -- Driver appearance slot + gender (helperIndex is runtime-only, not saved).
+        if worker.styleSlot ~= nil then
+            xmlFile:setInt(workerKey .. "#styleSlot", worker.styleSlot)
+        end
+        xmlFile:setBool(workerKey .. "#isMale", worker.isMale)
+
         -- Active-hand flag, stored per-worker (root attributes read back
         -- unreliably; per-element attributes like this are dependable).
         if worker.id == self.activeHandId then
@@ -160,6 +169,8 @@ function FarmHandManager:loadFromXMLFile(path)
             local worker = FarmHandWorker.new(id, xmlFile:getString(workerKey .. "#name", "Hand"))
             worker.hectaresWorked = xmlFile:getFloat(workerKey .. "#hectaresWorked", 0)
             worker.baseWage = xmlFile:getInt(workerKey .. "#baseWage", 2000)
+            worker.styleSlot = xmlFile:getInt(workerKey .. "#styleSlot", nil)
+            worker.isMale = xmlFile:getBool(workerKey .. "#isMale", true)
 
             local certStr = xmlFile:getString(workerKey .. "#certificates", "")
             for certId in string.gmatch(certStr, "%S+") do
@@ -270,6 +281,113 @@ function FarmHandManager:removeWorker(id)
     if self.activeHandId == id then
         self.activeHandId = self.workerOrder[1]
     end
+end
+
+-- =========================================================================
+-- Driver identity (consistent helper character + name per hand).
+-- =========================================================================
+
+--- Make a worker id safe for use as a HelperManager index name.
+function FarmHandManager:sanitizeId(id)
+    return tostring(id):gsub("[^%w_]", "_")
+end
+
+--- Gender of a playerStyle: true=male, false=female, nil=unknown.
+--- Gender is not a boolean on the runtime style; it is encoded in the player
+--- model filename the style references: dataS/character/playerM/playerM.xml
+--- (male) vs .../playerF/playerF.xml (female). We don't know which field holds
+--- that path at runtime, so scan the style's top-level string values for the
+--- "playerm"/"playerf" token. Returns true=male, false=female, nil=unknown.
+local function playerStyleIsMale(style)
+    if style == nil then
+        return nil
+    end
+    for _, v in pairs(style) do
+        if type(v) == "string" then
+            local lower = v:lower()
+            if lower:find("playerf", 1, true) then
+                return false
+            elseif lower:find("playerm", 1, true) then
+                return true
+            end
+        end
+    end
+    return nil
+end
+
+--- The vanilla helper at a style slot, or nil.
+function FarmHandManager:getVanillaStyle(slot)
+    if slot == nil then
+        return nil
+    end
+    local helper = g_helperManager:getHelperByIndex(slot)
+    return helper ~= nil and helper.playerStyle or nil
+end
+
+--- Register one HelperManager helper per hand so each gets a stable, gender-
+--- matched driver appearance (borrowed from a vanilla helper via styleSlot) and
+--- the hand's name as the HUD title. helperIndex is runtime-only and re-derived
+--- here every load; styleSlot/isMale are persisted so the face stays stable.
+function FarmHandManager:registerHelpersForRoster()
+    if g_helperManager == nil then
+        return
+    end
+
+    -- Capture the vanilla count BEFORE we add ours, so styleSlot only ever
+    -- borrows a base helper's appearance (ours get indices above this).
+    local vanillaCount = g_helperManager.numHelpers or 0
+    if vanillaCount <= 0 then
+        return -- helpers not ready yet; nothing to borrow from
+    end
+
+    -- Split the vanilla helpers into gender pools.
+    local maleSlots, femaleSlots = {}, {}
+    for slot = 1, vanillaCount do
+        local style = self:getVanillaStyle(slot)
+        local male = playerStyleIsMale(style)
+        if male == true then
+            maleSlots[#maleSlots + 1] = slot
+        elseif male == false then
+            femaleSlots[#femaleSlots + 1] = slot
+        end
+    end
+    local useGender = #maleSlots > 0 and #femaleSlots > 0
+
+    local maleCycle, femaleCycle, allCycle = 0, 0, 0
+    for _, worker in ipairs(self:getWorkersList()) do
+        if useGender then
+            local pool = worker.isMale and maleSlots or femaleSlots
+            -- (Re)assign if unset, or if the current slot's gender no longer
+            -- matches the hand (auto-corrects an old mismatched save).
+            local current = playerStyleIsMale(self:getVanillaStyle(worker.styleSlot))
+            if worker.styleSlot == nil or current ~= worker.isMale then
+                if worker.isMale then
+                    worker.styleSlot = pool[(maleCycle % #pool) + 1]
+                    maleCycle = maleCycle + 1
+                else
+                    worker.styleSlot = pool[(femaleCycle % #pool) + 1]
+                    femaleCycle = femaleCycle + 1
+                end
+            end
+        elseif worker.styleSlot == nil then
+            -- Gender unavailable: fall back to a plain all-helpers cycle.
+            worker.styleSlot = (allCycle % vanillaCount) + 1
+            allCycle = allCycle + 1
+        end
+
+        local slot = math.max(1, math.min(vanillaCount, worker.styleSlot))
+        local style = self:getVanillaStyle(slot)
+        local helper = g_helperManager:addHelper("FARMHAND_" .. self:sanitizeId(worker.id), worker.name, { 1, 1, 1 }, style)
+        if helper ~= nil then
+            worker.helperIndex = helper.index
+        end
+    end
+end
+
+--- The active hand's registered helper index, or nil (nil -> vanilla random).
+function FarmHandManager:getActiveHelperIndex()
+    local hand = self:getActiveHand()
+    return hand ~= nil and hand.helperIndex or nil
 end
 
 -- =========================================================================

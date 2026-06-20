@@ -41,6 +41,9 @@ FarmHand.manager = nil
 -- Whether the open-panel input hook has been installed (install-once guard).
 FarmHand.inputHookInstalled = false
 
+-- Whether the AIJob.start hook (forces the active hand's driver) is installed.
+FarmHand.aiJobHookInstalled = false
+
 --- Create the manager when a mission starts loading.
 -- Appended to Mission00.load so it runs for every savegame, single- or
 -- multiplayer, as part of normal mission setup.
@@ -59,6 +62,33 @@ function FarmHand:onMissionLoad(mission)
     -- Bind the open-panel key. Done here (not at script load) because the
     -- player input component class is reliably defined by mission load.
     FarmHand.installInputHook()
+
+    -- Force the active hand's driver/name at AI job start (guaranteed AIJob here).
+    FarmHand.installAIJobHook()
+end
+
+--- Append to base AIJob.start so the active hand's registered helper is used
+--- (its character + name). AIJobFieldWork:start calls super (this) BEFORE
+--- createAgent, so reassigning helperIndex here lands before the cab driver is
+--- built. nil active index = leave the base random pick untouched. Install-once.
+function FarmHand.onAIJobStart(self, farmId, ...)
+    local manager = FarmHand.manager
+    local idx = manager ~= nil and manager.getActiveHelperIndex and manager:getActiveHelperIndex() or nil
+    if idx ~= nil then
+        self.helperIndex = idx
+    end
+end
+
+function FarmHand.installAIJobHook()
+    if FarmHand.aiJobHookInstalled then
+        return
+    end
+    if AIJob == nil or AIJob.start == nil then
+        return
+    end
+
+    AIJob.start = Utils.appendedFunction(AIJob.start, FarmHand.onAIJobStart)
+    FarmHand.aiJobHookInstalled = true
 end
 
 --- Install the open-panel key hook once. Appends to the player's action-event
@@ -145,6 +175,11 @@ local function init()
     if FSCareerMissionInfo ~= nil then
         FSCareerMissionInfo.saveToXMLFile = Utils.appendedFunction(FSCareerMissionInfo.saveToXMLFile, FarmHand.onSaveToXMLFile)
     end
+
+    -- Force the active hand's driver at AI job start. Try at mod load (AIJob is
+    -- a job class, not a baked vehicle spec); onMissionLoad re-attempts as a
+    -- guaranteed fallback, and the install-once guard prevents double-wrapping.
+    FarmHand.installAIJobHook()
 
     print(string.format("FarmHand %s loaded.", FarmHand.VERSION))
 end
