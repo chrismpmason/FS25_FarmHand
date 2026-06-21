@@ -456,8 +456,6 @@ function FarmHandManager:generateCandidates(n)
             isMale = isMale,
         }
         self.candidates[#self.candidates + 1] = candidate
-        print(string.format("FarmHand [DEBUG]: candidate %s isMale=%s", -- TEMP DEBUG
-            candidate.name, tostring(candidate.isMale)))
     end
 end
 
@@ -493,9 +491,6 @@ function FarmHandManager:hireCandidate(candidateId)
     self:registerHelperForHand(worker)
 
     table.remove(self.candidates, index)
-
-    print(string.format("FarmHand [DEBUG]: hired %s isMale=%s -> roster now %d hands", -- TEMP DEBUG
-        worker.name, tostring(worker.isMale), #self:getWorkersList()))
 
     return worker
 end

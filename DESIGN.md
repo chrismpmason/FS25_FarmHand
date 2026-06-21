@@ -109,6 +109,29 @@ Experience also drives **equipment wear**: a green hand is hard on machinery (~1
 curving down to ~0.9× for a veteran. The curve is front-loaded so the first improvements
 feel meaningful.
 
+### Experience → wear: ADS integration plan
+
+Current experience-to-wear writes the vanilla wear values. The Advanced Damage System mod
+(ADS — id577/FS25_AdvancedDamageSystem) completely replaces the vanilla damage system with
+per-system Condition + Stress, driving wear from operating conditions and producing dynamic
+breakdowns. When ADS is installed, FarmHand's vanilla-wear writes are ignored or fight ADS
+for the same datum — the one-owner problem, live.
+
+Plan:
+
+- **Optional soft-dependency.** Detect ADS at load. If absent, keep current vanilla-wear
+  behaviour. If present, switch to the ADS path AND stop writing vanilla wear (avoid the
+  conflict).
+- **Route experience through ADS Stress, not a wear%.** A green hand drives Stress up faster
+  (higher breakdown risk); a veteran operates smoothly. Experience becomes breakdowns, not a
+  hidden number.
+- **Couple loosely.** ADS moves fast and warns compatibility across versions isn't
+  guaranteed. Integrate at a stable modifier point (ADS already hands subsystems to other
+  mods, e.g. CVT Addon for transmission wear — the seam exists), not deep internals. Respect
+  ADS's licence: learn the hook, write our own code.
+- **Recon first.** Build step 1: detect ADS and locate its wear/stress modifier seam in its
+  open source.
+
 ---
 
 ## 6. Employment & the UK employment-law layer (the terms)
@@ -147,6 +170,45 @@ notice, process, and potentially redundancy — the stick that makes retention m
 **Compliance.** Paying below the minimum or breaking the rules makes you non-compliant
 (Fair Work Agency enforcement, fines) — natural synergy with the Red Tape mod. The 2026→2027
 legal transition can be a flavour hook.
+
+### Wage realism: UK farm-pay grounding
+
+The current model (flat £2,000/month base + £500/cert) is a believable average but isn't
+anchored to the real UK floor, and the per-cert structure isn't how UK ag pay works.
+
+- **Legal floor:** April 2026 National Minimum Wage is £12.71/hr (21+). At the agricultural
+  standard 39-hour week, a full-time adult hand can't lawfully earn below ~£25,800/yr
+  (~£2,150/month). The current £2,000 base sits just under that. Peg the floor to the real
+  NMW, not a round number.
+- **Typical actual pay:** UK farm workers average ~£22k–£27k/yr (Indeed ~£27.3k; Glassdoor
+  ~£22.4k farm / ~£23.5k agriculture), ranging ~£19k entry to ~£31–33k experienced. The base
+  figure is roughly right; it's the floor and structure that need work.
+- **Structure — grade by role, not flat-per-cert:** real ag pay is set by job grade, role and
+  experience. A certificate should unlock a higher-paying role/grade rather than apply a fixed
+  monthly top-up.
+- **England vs graded nations:** England abolished its Agricultural Wages Board (2013), so
+  English workers are on plain NMW (our baseline — Chris is England-based). Wales/Scotland/NI
+  keep graded Agricultural Minimum Wage boards above NMW. Modelling the graded system is
+  optional depth.
+- **Ag-specific extras (optional realism layer):** night-work premium (7pm–6am), weekly
+  allowance per working dog kept, accommodation offset if housed, on-call allowance,
+  apprentice rates pegged to a grade, agricultural sick pay at the minimum wage.
+
+### Wage = true cost of employment — IMPLEMENTED (7e6886d)
+
+The monthly salary is now the only labour cost for a hand's work. An addMoney override
+suppresses the vanilla helper charge (MoneyType.AI) while a FarmHand job runs on the player's
+farm, so the player no longer double-pays (salary + per-job fee). Gated by the
+salaryReplacesHelperCost setting (default ON), a per-job counter (incremented on job start,
+cleared on stop/delete), and a passthrough guard on the mod's own money ops. Realises the
+"true cost of employment" pillar: you pay a salary, not a per-job fee.
+
+### Wage negotiations (planned)
+
+Pay isn't fixed by the game — the player sets it, and it should matter. A negotiation beat at
+hire (and for retention): the offered wage interacts with leave-risk (underpay raises quit
+chance) and candidate willingness. Grounds the loop in a real decision rather than a fixed
+cost.
 
 ---
 
@@ -254,3 +316,7 @@ should climb and whether to cap how many top tickets one hand can hold.
   proficiency.** Never merge them.
 - The single hand who grows with the farm is the spine. Every system should serve that arc
   first and the roster second.
+- **One owner per datum.** Every piece of state has exactly one authoritative owner; two
+  systems must never both write the same datum. The ADS/wear conflict is the live example —
+  when ADS owns wear, FarmHand must not also write it. Governs all integration and
+  persistence work.
