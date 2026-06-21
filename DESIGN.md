@@ -109,28 +109,25 @@ Experience also drives **equipment wear**: a green hand is hard on machinery (~1
 curving down to ~0.9× for a veteran. The curve is front-loaded so the first improvements
 feel meaningful.
 
-### Experience → wear: ADS integration plan
+### Experience → wear: ADS integration — IMPLEMENTED (6dd52c2)
 
-Current experience-to-wear writes the vanilla wear values. The Advanced Damage System mod
-(ADS — id577/FS25_AdvancedDamageSystem) completely replaces the vanilla damage system with
-per-system Condition + Stress, driving wear from operating conditions and producing dynamic
-breakdowns. When ADS is installed, FarmHand's vanilla-wear writes are ignored or fight ADS
-for the same datum — the one-owner problem, live.
+Experience-to-wear routes through ADS when present, via a per-vehicle override. We write none
+of ADS's fields — one-owner respected.
 
-Plan:
-
-- **Optional soft-dependency.** Detect ADS at load. If absent, keep current vanilla-wear
-  behaviour. If present, switch to the ADS path AND stop writing vanilla wear (avoid the
-  conflict).
-- **Route experience through ADS Stress, not a wear%.** A green hand drives Stress up faster
-  (higher breakdown risk); a veteran operates smoothly. Experience becomes breakdowns, not a
-  hidden number.
-- **Couple loosely.** ADS moves fast and warns compatibility across versions isn't
-  guaranteed. Integrate at a stable modifier point (ADS already hands subsystems to other
-  mods, e.g. CVT Addon for transmission wear — the seam exists), not deep internals. Respect
-  ADS's licence: learn the hook, write our own code.
-- **Recon first.** Build step 1: detect ADS and locate its wear/stress modifier seam in its
-  open source.
+- Detection: FarmHandWear.adsPresent = g_modIsLoaded["FS25_AdvancedDamageSystem"], checked at
+  mission start (onMissionLoad). (g_modIsLoaded is a TABLE, indexed not called.)
+- Override: at job start, each combination vehicle that has updateSystemConditionAndStress
+  gets an INSTANCE-level shadow of that function (guarded), scaling the wearRate argument by
+  the active hand's experience factor (~x1.75 green … x0.9 veteran) before deferring to the
+  saved original. ADS's own calc then drives condition, stress and breakdowns off the scaled
+  input. Removed at job end.
+- Why per-instance, NOT a class-level wrap: vehicle types finalize ("Loaded vehicle types")
+  BEFORE FarmHand's mod loads, so ADS has already captured
+  AdvancedDamageSystem.updateSystemConditionAndStress into the types before our code exists —
+  a class-level wrap can never win that race. Instance-field shadowing is timing-independent.
+  Do not re-attempt the class-wrap.
+- extraConditionWear is ADS-owned (breakdown effects write/reset it) — left untouched.
+- Without ADS: vanilla applyToCombination path, unchanged.
 
 ---
 
