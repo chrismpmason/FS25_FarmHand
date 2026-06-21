@@ -57,6 +57,13 @@ function FarmHandManager.new(modDirectory, modName)
     -- The certificate gate will check this worker. nil = no hand selected.
     self.activeHandId = nil
 
+    -- Helper-cost suppression. farmHandJobCount > 0 means at least one FarmHand AI
+    -- job is running, so its vanilla per-job fee (MoneyType.AI) is suppressed and
+    -- the monthly salary is the only labour cost. moneyPassthrough guards our OWN
+    -- money operations so they always go through the addMoney hook untouched.
+    self.farmHandJobCount = 0
+    self.moneyPassthrough = false
+
     return self
 end
 
@@ -582,8 +589,13 @@ function FarmHandManager:payWages()
     -- Crib of Employment's monthly salary deduction: record the change for the
     -- finance stats, then move the farm balance.
     local moneyType = MoneyType.WAGES or MoneyType.OTHER
+
+    -- Passthrough guard so the helper-cost suppression hook never touches our own
+    -- deduction (belt-and-suspenders; wages are MoneyType.WAGES, not AI anyway).
+    self.moneyPassthrough = true
     g_currentMission:addMoneyChange(-total, farm:getId(), moneyType, true)
     farm:changeBalance(-total, moneyType)
+    self.moneyPassthrough = false
 end
 
 --- 4. For each worker, roll the leave-risk. The more a hand's market wage

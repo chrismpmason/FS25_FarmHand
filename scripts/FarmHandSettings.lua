@@ -19,6 +19,11 @@ function FarmHandSettings.new()
 
     self.wageMultiplier = 1.0
 
+    -- When ON (default), the monthly salary REPLACES the vanilla per-job helper
+    -- fee: that fee is suppressed while a FarmHand does the work, so labour is
+    -- paid for once (the salary), not twice. Toggle OFF to pay both.
+    self.salaryReplacesHelperCost = true
+
     -- Experience-to-wear curve: multiplier = floor + (green - floor) * exp(-ha / K).
     self.wearFloor = 0.9   -- veteran (many hectares): easiest on machinery
     self.wearGreen = 1.75  -- green (zero hectares): hardest on machinery
@@ -55,6 +60,10 @@ end
 
 function FarmHandSettings:getWageMultiplier()
     return self.wageMultiplier
+end
+
+function FarmHandSettings:getSalaryReplacesHelperCost()
+    return self.salaryReplacesHelperCost
 end
 
 function FarmHandSettings:getWearFloor()

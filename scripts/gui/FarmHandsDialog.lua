@@ -98,14 +98,18 @@ function FarmHandsDialog:refreshContents()
             self.handList:setSelectedItem(1, 1)
         end
     else
-        local selectIndex = 1
+        -- Select the active hand's row. With no active hand (toggled off), select
+        -- nothing so no row renders as green/active.
+        local selectIndex = nil
         for i, hand in ipairs(self.hands) do
             if manager ~= nil and hand.id == manager.activeHandId then
                 selectIndex = i
                 break
             end
         end
-        self.handList:setSelectedItem(1, selectIndex)
+        if selectIndex ~= nil then
+            self.handList:setSelectedItem(1, selectIndex)
+        end
     end
 end
 
@@ -249,6 +253,15 @@ function FarmHandsDialog:onClickHand(item)
     end
 
     local manager = FarmHand.manager
+
+    -- Click the already-active hand to toggle it OFF (no active hand), so no row
+    -- reads as active and a dispatched helper bills the vanilla fee.
+    if manager ~= nil and hand.id == manager.activeHandId then
+        manager:clearActiveHand()
+        self:refreshContents()
+        return
+    end
+
     if manager ~= nil then
         manager:setActiveHand(hand.id)
     end

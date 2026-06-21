@@ -65,17 +65,55 @@ function FarmHand:onMissionLoad(mission)
 
     -- Force the active hand's driver/name at AI job start (guaranteed AIJob here).
     FarmHand.installAIJobHook()
+
+    -- Suppress the vanilla per-job helper fee while a FarmHand does the work, so
+    -- the monthly salary is the only labour cost. Hooks this mission's addMoney.
+    FarmHand.installAddMoneyHook()
 end
 
---- Append to base AIJob.start so the active hand's registered helper is used
---- (its character + name). AIJobFieldWork:start calls super (this) BEFORE
---- createAgent, so reassigning helperIndex here lands before the cab driver is
---- built. nil active index = leave the base random pick untouched. Install-once.
+--- Append to base AIJob.start. Two jobs in one:
+--- (1) Driver identity: force the active hand's registered helper (character +
+---     name). AIJobFieldWork:start calls super (this) BEFORE createAgent, so
+---     reassigning helperIndex here lands before the cab driver is built.
+--- (2) Cost suppression: mark this job FarmHand-run and bump the running-job
+---     counter, so its per-job helper fee is suppressed in addMoney.
+--- Only counts when a hand is active (Option-A: the active hand does the work).
 function FarmHand.onAIJobStart(self, farmId, ...)
     local manager = FarmHand.manager
-    local idx = manager ~= nil and manager.getActiveHelperIndex and manager:getActiveHelperIndex() or nil
+    if manager == nil then
+        return
+    end
+
+    local hand = manager:getActiveHand()
+    if hand == nil then
+        return -- no active hand: a vanilla helper job, leave it untouched
+    end
+
+    local idx = manager.getActiveHelperIndex and manager:getActiveHelperIndex() or nil
     if idx ~= nil then
         self.helperIndex = idx
+    end
+
+    -- Per-job flag keeps the counter balanced across the stop/delete end hooks
+    -- (only the first to fire decrements). Guard against a double start().
+    if not self.farmHandCounted then
+        self.farmHandCounted = true
+        manager.farmHandJobCount = (manager.farmHandJobCount or 0) + 1
+    end
+end
+
+--- Appended to AIJob.stop and AIJob.delete: decrement the running-job counter
+--- once per job, gated by the per-job flag so stop-then-delete only counts down
+--- once. Clamped at 0 so a missed/extra end can never drive it negative.
+function FarmHand.onAIJobEnd(self, ...)
+    if not self.farmHandCounted then
+        return
+    end
+    self.farmHandCounted = false
+
+    local manager = FarmHand.manager
+    if manager ~= nil then
+        manager.farmHandJobCount = math.max(0, (manager.farmHandJobCount or 0) - 1)
     end
 end
 
@@ -88,7 +126,54 @@ function FarmHand.installAIJobHook()
     end
 
     AIJob.start = Utils.appendedFunction(AIJob.start, FarmHand.onAIJobStart)
+
+    -- End signals: hook both stop and delete (guarded). The per-job flag means
+    -- whichever fires first does the single decrement.
+    if AIJob.stop ~= nil then
+        AIJob.stop = Utils.appendedFunction(AIJob.stop, FarmHand.onAIJobEnd)
+    end
+    if AIJob.delete ~= nil then
+        AIJob.delete = Utils.appendedFunction(AIJob.delete, FarmHand.onAIJobEnd)
+    end
+
     FarmHand.aiJobHookInstalled = true
+end
+
+--- Overwrites THIS mission's addMoney to suppress the vanilla per-job helper fee
+--- (MoneyType.AI) while a FarmHand job is running on the player's farm, so the
+--- monthly salary is the only labour cost. Every other charge passes through.
+function FarmHand.addMoneyOverride(self, superFunc, amount, farmId, moneyType, addChange, ...)
+    local manager = FarmHand.manager
+    local isAI = MoneyType ~= nil and MoneyType.AI ~= nil and moneyType == MoneyType.AI
+
+    if isAI and manager ~= nil and not manager.moneyPassthrough
+        and manager.settings ~= nil and manager.settings:getSalaryReplacesHelperCost() then
+
+        local playerFarmId = g_currentMission ~= nil and g_currentMission:getFarmId() or nil
+        local isPlayerFarm = playerFarmId ~= nil and farmId == playerFarmId
+        local jobRunning = (manager.farmHandJobCount or 0) > 0
+
+        if isPlayerFarm and jobRunning then
+            return -- skip the charge entirely: the salary already covers this labour
+        end
+    end
+
+    return superFunc(self, amount, farmId, moneyType, addChange, ...)
+end
+
+--- Install the addMoney suppression hook on the current mission instance. Done
+--- per mission load (a new g_currentMission each game has the base method);
+--- guarded by a per-instance marker so a re-entry never double-wraps.
+function FarmHand.installAddMoneyHook()
+    if g_currentMission == nil or g_currentMission.addMoney == nil then
+        return
+    end
+    if g_currentMission.farmHandAddMoneyHooked then
+        return
+    end
+
+    g_currentMission.addMoney = Utils.overwrittenFunction(g_currentMission.addMoney, FarmHand.addMoneyOverride)
+    g_currentMission.farmHandAddMoneyHooked = true
 end
 
 --- Install the open-panel key hook once. Appends to the player's action-event
