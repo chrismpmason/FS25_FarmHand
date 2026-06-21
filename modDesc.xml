@@ -30,11 +30,17 @@ Decide who is worth keeping.]]></en>
 
     <actions>
         <action name="FARMHAND_OPEN" axisType="HALF"/>
+        <!-- TEMP: hire-first-candidate debug trigger; removed when the K panel wires hiring. -->
+        <action name="FARMHAND_HIRE" axisType="HALF"/>
     </actions>
 
     <inputBinding>
         <actionBinding action="FARMHAND_OPEN">
             <binding device="KB_MOUSE_DEFAULT" input="KEY_k"/>
+        </actionBinding>
+        <!-- TEMP: hire-first-candidate debug trigger. -->
+        <actionBinding action="FARMHAND_HIRE">
+            <binding device="KB_MOUSE_DEFAULT" input="KEY_j"/>
         </actionBinding>
     </inputBinding>
 
@@ -50,6 +56,9 @@ Decide who is worth keeping.]]></en>
         </text>
         <text name="input_FARMHAND_OPEN">
             <en>Farm Hands panel</en>
+        </text>
+        <text name="input_FARMHAND_HIRE">
+            <en>Hire first candidate (debug)</en>
         </text>
     </l10n>
 </modDesc>

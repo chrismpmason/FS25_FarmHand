@@ -20,6 +20,18 @@ FarmHandManager.CERT_WAGE_PREMIUM = 500
 
 local FarmHandManager_mt = Class(FarmHandManager)
 
+-- Name pools for generating green candidates. Small hardcoded lists; a first
+-- name is picked to match the candidate's gender, paired with a random surname.
+local MALE_FIRST = {
+    "Jack", "Tom", "Harry", "George", "Charlie", "Oliver", "Jacob", "Alfie", "Ryan", "Sam",
+}
+local FEMALE_FIRST = {
+    "Emily", "Sophie", "Grace", "Lucy", "Chloe", "Ella", "Mia", "Freya", "Holly", "Daisy",
+}
+local SURNAMES = {
+    "Carter", "Hale", "Watson", "Brennan", "Fletcher", "Marsh", "Doyle", "Pryce", "Whitlock", "Ainsley",
+}
+
 --- Construct a manager. Does not touch game state yet; see load().
 -- @param modDirectory absolute path to the mod, for loading resources
 -- @param modName the registered mod name
@@ -31,8 +43,12 @@ function FarmHandManager.new(modDirectory, modName)
 
     self.settings = FarmHandSettings.new()
 
-    -- Hire pool: candidates available this month.
+    -- Hire pool: candidates available this month. Runtime-only, never saved;
+    -- regenerated on load and on every month tick. Each entry: {id, name, isMale}.
     self.candidates = {}
+    -- Monotonic counters for unique runtime ids (candidate ids / hired worker ids).
+    self.candidateCounter = 0
+    self.hireCounter = 0
     -- Employed workers, keyed by worker id (id -> FarmHandWorker).
     self.workers = {}
     -- Stable display order for the roster (workers itself is keyed by id).
@@ -56,6 +72,9 @@ function FarmHandManager:load()
 
     -- Register a per-hand helper (driver appearance + name) for the whole roster.
     self:registerHelpersForRoster()
+
+    -- Seed the hire pool (runtime-only; regenerated monthly via refreshCandidates).
+    self:generateCandidates()
 end
 
 --- Seed the default roster for a brand-new game (no save yet). TEMPORARY test
@@ -324,64 +343,154 @@ function FarmHandManager:getVanillaStyle(slot)
     return helper ~= nil and helper.playerStyle or nil
 end
 
---- Register one HelperManager helper per hand so each gets a stable, gender-
---- matched driver appearance (borrowed from a vanilla helper via styleSlot) and
---- the hand's name as the HUD title. helperIndex is runtime-only and re-derived
---- here every load; styleSlot/isMale are persisted so the face stays stable.
-function FarmHandManager:registerHelpersForRoster()
+--- Split the vanilla helpers into male/female style-slot pools and cache them on
+--- the manager. Must run BEFORE we add any of our own helpers, so the count and
+--- slots only ever reflect base-game helpers (ours land at indices above these).
+--- The cached pools + cycle counters are reused for mid-game hires.
+function FarmHandManager:buildGenderPools()
+    self.maleSlots, self.femaleSlots = {}, {}
+    self.vanillaCount = 0
+    self.useGender = false
+    self.maleCycle, self.femaleCycle, self.allCycle = 0, 0, 0
+
     if g_helperManager == nil then
         return
     end
-
-    -- Capture the vanilla count BEFORE we add ours, so styleSlot only ever
-    -- borrows a base helper's appearance (ours get indices above this).
     local vanillaCount = g_helperManager.numHelpers or 0
     if vanillaCount <= 0 then
         return -- helpers not ready yet; nothing to borrow from
     end
+    self.vanillaCount = vanillaCount
 
-    -- Split the vanilla helpers into gender pools.
-    local maleSlots, femaleSlots = {}, {}
     for slot = 1, vanillaCount do
-        local style = self:getVanillaStyle(slot)
-        local male = playerStyleIsMale(style)
+        local male = playerStyleIsMale(self:getVanillaStyle(slot))
         if male == true then
-            maleSlots[#maleSlots + 1] = slot
+            self.maleSlots[#self.maleSlots + 1] = slot
         elseif male == false then
-            femaleSlots[#femaleSlots + 1] = slot
+            self.femaleSlots[#self.femaleSlots + 1] = slot
         end
     end
-    local useGender = #maleSlots > 0 and #femaleSlots > 0
+    self.useGender = #self.maleSlots > 0 and #self.femaleSlots > 0
+end
 
-    local maleCycle, femaleCycle, allCycle = 0, 0, 0
-    for _, worker in ipairs(self:getWorkersList()) do
-        if useGender then
-            local pool = worker.isMale and maleSlots or femaleSlots
-            -- (Re)assign if unset, or if the current slot's gender no longer
-            -- matches the hand (auto-corrects an old mismatched save).
-            local current = playerStyleIsMale(self:getVanillaStyle(worker.styleSlot))
-            if worker.styleSlot == nil or current ~= worker.isMale then
-                if worker.isMale then
-                    worker.styleSlot = pool[(maleCycle % #pool) + 1]
-                    maleCycle = maleCycle + 1
-                else
-                    worker.styleSlot = pool[(femaleCycle % #pool) + 1]
-                    femaleCycle = femaleCycle + 1
-                end
+--- Give one hand a stable, gender-matched driver: pick a styleSlot from the
+--- matching-gender pool (if not already set / if the current slot's gender no
+--- longer matches), borrow that vanilla helper's appearance, and register a
+--- per-hand HelperManager helper titled with the hand's name. helperIndex is
+--- runtime-only; styleSlot/isMale persist so the face stays stable across loads.
+--- Requires buildGenderPools() to have run first.
+function FarmHandManager:registerHelperForHand(hand)
+    if g_helperManager == nil or (self.vanillaCount or 0) <= 0 then
+        return
+    end
+
+    if self.useGender then
+        local pool = hand.isMale and self.maleSlots or self.femaleSlots
+        local current = playerStyleIsMale(self:getVanillaStyle(hand.styleSlot))
+        if hand.styleSlot == nil or current ~= hand.isMale then
+            if hand.isMale then
+                hand.styleSlot = pool[(self.maleCycle % #pool) + 1]
+                self.maleCycle = self.maleCycle + 1
+            else
+                hand.styleSlot = pool[(self.femaleCycle % #pool) + 1]
+                self.femaleCycle = self.femaleCycle + 1
             end
-        elseif worker.styleSlot == nil then
-            -- Gender unavailable: fall back to a plain all-helpers cycle.
-            worker.styleSlot = (allCycle % vanillaCount) + 1
-            allCycle = allCycle + 1
         end
+    elseif hand.styleSlot == nil then
+        -- Gender unavailable: fall back to a plain all-helpers cycle.
+        hand.styleSlot = (self.allCycle % self.vanillaCount) + 1
+        self.allCycle = self.allCycle + 1
+    end
 
-        local slot = math.max(1, math.min(vanillaCount, worker.styleSlot))
-        local style = self:getVanillaStyle(slot)
-        local helper = g_helperManager:addHelper("FARMHAND_" .. self:sanitizeId(worker.id), worker.name, { 1, 1, 1 }, style)
-        if helper ~= nil then
-            worker.helperIndex = helper.index
+    local slot = math.max(1, math.min(self.vanillaCount, hand.styleSlot))
+    local style = self:getVanillaStyle(slot)
+    local helper = g_helperManager:addHelper("FARMHAND_" .. self:sanitizeId(hand.id), hand.name, { 1, 1, 1 }, style)
+    if helper ~= nil then
+        hand.helperIndex = helper.index
+    end
+end
+
+--- Register a per-hand helper for the whole roster. Re-derives the gender pools
+--- (capturing the vanilla count before adding ours) and registers each hand.
+function FarmHandManager:registerHelpersForRoster()
+    self:buildGenderPools()
+    if (self.vanillaCount or 0) <= 0 then
+        return
+    end
+    for _, worker in ipairs(self:getWorkersList()) do
+        self:registerHelperForHand(worker)
+    end
+end
+
+-- =========================================================================
+-- Hire pool (candidates) + hiring. Candidates are runtime-only and never
+-- saved; hired hands enter the roster and ride the existing persistence.
+-- =========================================================================
+
+--- A gender-matched random display name, e.g. "First Last".
+function FarmHandManager:makeCandidateName(isMale)
+    local firsts = isMale and MALE_FIRST or FEMALE_FIRST
+    local first = firsts[math.random(#firsts)]
+    local last = SURNAMES[math.random(#SURNAMES)]
+    return first .. " " .. last
+end
+
+--- Replace the hire pool with n freshly generated green candidates, each with a
+--- random gender, a gender-matched name, and a unique runtime id.
+function FarmHandManager:generateCandidates(n)
+    n = n or 3
+    self.candidates = {}
+    for _ = 1, n do
+        self.candidateCounter = self.candidateCounter + 1
+        local isMale = math.random() < 0.5
+        local candidate = {
+            id = "cand_" .. self.candidateCounter,
+            name = self:makeCandidateName(isMale),
+            isMale = isMale,
+        }
+        self.candidates[#self.candidates + 1] = candidate
+        print(string.format("FarmHand [DEBUG]: candidate %s isMale=%s", -- TEMP DEBUG
+            candidate.name, tostring(candidate.isMale)))
+    end
+end
+
+--- Hire a candidate by id: create a green worker from it, add it to the roster,
+--- assign its driver identity now, and remove it from the pool. Returns the new
+--- worker, or nil if no such candidate. v1: no recruitment fee (wages are the
+--- cost); the candidate pool is not persisted.
+function FarmHandManager:hireCandidate(candidateId)
+    local index, candidate
+    for i, c in ipairs(self.candidates) do
+        if c.id == candidateId then
+            index, candidate = i, c
+            break
         end
     end
+    if candidate == nil then
+        return nil
+    end
+
+    -- Unique worker id, guarded against colliding with a reloaded "hire_N".
+    local workerId
+    repeat
+        self.hireCounter = self.hireCounter + 1
+        workerId = "hire_" .. self.hireCounter
+    until self.workers[workerId] == nil
+
+    -- Green by construction: FarmHandWorker.new() defaults 0 hectares, no certs,
+    -- no course and the standard base wage. Only identity comes from the candidate.
+    local worker = FarmHandWorker.new(workerId, candidate.name)
+    worker.isMale = candidate.isMale
+
+    self:addWorker(worker)
+    self:registerHelperForHand(worker)
+
+    table.remove(self.candidates, index)
+
+    print(string.format("FarmHand [DEBUG]: hired %s isMale=%s -> roster now %d hands", -- TEMP DEBUG
+        worker.name, tostring(worker.isMale), #self:getWorkersList()))
+
+    return worker
 end
 
 --- The active hand's registered helper index, or nil (nil -> vanilla random).
@@ -510,9 +619,10 @@ function FarmHandManager:runRetentionCheck()
     end
 end
 
---- 5. Replace the hire pool with a freshly generated set of candidates.
+--- 5. Replace the hire pool with a freshly generated set of candidates
+--- (monthly = full regenerate; the pool is runtime-only and never persisted).
 function FarmHandManager:refreshCandidates()
-    -- TODO(slice 1): generate names, low starting experience, wage, signing cost.
+    self:generateCandidates()
 end
 
 --- Clear per-month accumulators (the worked-this-month flag) ready for the new

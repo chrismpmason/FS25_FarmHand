@@ -13,7 +13,7 @@
             <Text profile="farmHands_title" text="$l10n_farmhand_ui_title"/>
 
             <GuiElement profile="farmHands_listContainer" id="handContainer">
-                <SmoothList profile="fs25_animalTargetList" id="handList" startClipperElementName="startClipper" endClipperElementName="endClipper">
+                <SmoothList profile="farmHands_handList" id="handList" startClipperElementName="startClipper" endClipperElementName="endClipper">
                     <ListItem profile="farmHands_listItem" onClick="onClickHand">
                         <Bitmap profile="farmHands_listItemBg" name="alternating"/>
                         <Text profile="farmHands_cellName" name="name"/>
@@ -22,7 +22,10 @@
                     </ListItem>
                 </SmoothList>
                 <Bitmap profile="fs25_secondaryMenuStartClipper" name="startClipper"/>
-                <Bitmap profile="fs25_secondaryMenuStopClipper" name="endClipper"/>
+                <!-- Generous clip window (well past the 300px list) so it never cuts
+                     off the 5 rows. The clipper does not govern row count here; the
+                     list element's own height does (see farmHands_handList below). -->
+                <Bitmap profile="fs25_secondaryMenuStopClipper" name="endClipper" position="0px -600px"/>
                 <ThreePartBitmap profile="fs25_subCategoryListSliderBox" position="20px 0px">
                     <Slider profile="fs25_animalTargetListSlider" id="handSlider" dataElementId="handList"/>
                 </ThreePartBitmap>
@@ -52,6 +55,15 @@
         <Profile name="farmHands_listContainer" extends="emptyPanel" with="anchorTopStretchingX pivotTopLeft">
             <position value="0px -80px"/>
             <absoluteSizeOffset value="80px 520px"/>
+        </Profile>
+
+        <!-- Scrollable list. The visible row count is governed by THIS element's
+             height (the clipper window is inert here), so set it to 5 rows x 60px.
+             Use <height> + anchorTopStretchingX (NOT <size>, whose width component
+             would zero the rows) so width fills the container - same pattern as
+             farmHands_listItem below. -->
+        <Profile name="farmHands_handList" extends="fs25_animalTargetList" with="anchorTopStretchingX pivotTopLeft">
+            <height value="300px"/>
         </Profile>
 
         <!-- Row: MUST stretch across the list (anchorTopStretchingX) with a height,
