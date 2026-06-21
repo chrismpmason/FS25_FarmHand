@@ -69,6 +69,11 @@ function FarmHand:onMissionLoad(mission)
     -- Suppress the vanilla per-job helper fee while a FarmHand does the work, so
     -- the monthly salary is the only labour cost. Hooks this mission's addMoney.
     FarmHand.installAddMoneyHook()
+
+    -- Detect ADS at mission start (reliable by runtime, unlike mod load order: ADS
+    -- finalizes vehicle types before FarmHand even loads). The AI-job hooks use
+    -- this to decide between the ADS per-instance override and the vanilla path.
+    FarmHandWear.adsPresent = g_modIsLoaded ~= nil and g_modIsLoaded["FS25_AdvancedDamageSystem"] == true
 end
 
 --- Append to base AIJob.start. Two jobs in one:
@@ -99,6 +104,14 @@ function FarmHand.onAIJobStart(self, farmId, ...)
     if not self.farmHandCounted then
         self.farmHandCounted = true
         manager.farmHandJobCount = (manager.farmHandJobCount or 0) + 1
+
+        -- ADS path: scale this hand's vehicles' wear with a per-instance override
+        -- (removed at job end). Instance-field shadowing is independent of the
+        -- load/finalize order that defeats a class-level wrap.
+        if FarmHandWear.adsPresent then
+            self._farmHandAdsVehicles =
+                FarmHandWear.applyADSOverride(FarmHand.getJobRootVehicle(self), hand, manager.settings)
+        end
     end
 end
 
@@ -115,6 +128,31 @@ function FarmHand.onAIJobEnd(self, ...)
     if manager ~= nil then
         manager.farmHandJobCount = math.max(0, (manager.farmHandJobCount or 0) - 1)
     end
+
+    -- Restore the ADS per-instance overrides installed for this job's vehicles.
+    if self._farmHandAdsVehicles ~= nil then
+        FarmHandWear.removeADSOverride(self._farmHandAdsVehicles)
+        self._farmHandAdsVehicles = nil
+    end
+end
+
+--- Best-effort extraction of an AI job's root vehicle (the combination to scale
+--- for ADS). Tries the job's accessors defensively; returns nil if none yields a
+--- vehicle, in which case the ADS override is simply skipped for that job.
+function FarmHand.getJobRootVehicle(job)
+    if job == nil then
+        return nil
+    end
+    if job.getVehicle ~= nil then
+        local v = job:getVehicle()
+        if v ~= nil then
+            return v
+        end
+    end
+    if job.vehicleParameter ~= nil and job.vehicleParameter.getVehicle ~= nil then
+        return job.vehicleParameter:getVehicle()
+    end
+    return nil
 end
 
 function FarmHand.installAIJobHook()

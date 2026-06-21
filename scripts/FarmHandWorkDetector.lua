@@ -118,8 +118,12 @@ local function onUpdateAIFieldWorker(self, dt)
     hand.hectaresWorked = hand.hectaresWorked + deltaHa
     hand.workedThisMonth = true
 
-    -- Apply the experience-to-wear curve to this combination's machinery.
-    FarmHandWear.applyToCombination(self, hand, manager.settings)
+    -- Experience-to-wear. When ADS owns the damage model, the per-job instance
+    -- override (installed at job start) does the scaling, so write no vanilla
+    -- wear here. Otherwise rescale vanilla wear directly.
+    if not FarmHandWear.adsPresent then
+        FarmHandWear.applyToCombination(self, hand, manager.settings)
+    end
 end
 
 --- Install the hook. Idempotent.
