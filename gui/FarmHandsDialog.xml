@@ -34,6 +34,11 @@
         </GuiElement>
 
         <BoxLayout profile="fs25_dialogButtonBox">
+            <!-- Toggle between the roster and the hire pool. Same profile/pattern as
+                 the Back button (proven-safe). inputAction override gives it its OWN
+                 footer glyph instead of inheriting buttonBack's MENU_BACK (ESC), so
+                 ESC stays bound to Back alone. Label is set in Lua per destination. -->
+            <Button profile="buttonBack" inputAction="MENU_EXTRA_1" text="$l10n_farmhand_ui_view_hire" onClick="onClickToggleMode" id="modeButton"/>
             <Button profile="buttonBack" text="$l10n_button_back" onClick="onClickBack" id="backButton"/>
         </BoxLayout>
     </GuiElement>

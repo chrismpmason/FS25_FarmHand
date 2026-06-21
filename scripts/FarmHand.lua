@@ -117,44 +117,17 @@ function FarmHand.onRegisterPlayerActionEvents(playerInputComponent)
 
     g_inputBinding:beginActionEventsModification(PlayerInputComponent.INPUT_CONTEXT_NAME)
     local _, eventId = g_inputBinding:registerActionEvent(InputAction.FARMHAND_OPEN, FarmHand, FarmHand.onOpenFarmHands, false, true, false, true)
-
-    -- TEMP: hire-first-candidate debug trigger, removed when the K panel wires
-    -- hiring. A NEW binding only registers after a full game restart.
-    local _, hireEventId = g_inputBinding:registerActionEvent(InputAction.FARMHAND_HIRE, FarmHand, FarmHand.onHireFirstCandidate, false, true, false, true)
     g_inputBinding:endActionEventsModification()
 
     if eventId ~= nil then
         g_inputBinding:setActionEventText(eventId, g_i18n:getText("input_FARMHAND_OPEN"))
         g_inputBinding:setActionEventTextVisibility(eventId, true)
     end
-    if hireEventId ~= nil then
-        g_inputBinding:setActionEventText(hireEventId, g_i18n:getText("input_FARMHAND_HIRE"))
-        g_inputBinding:setActionEventTextVisibility(hireEventId, true)
-    end
 end
 
 --- Open-panel action callback.
 function FarmHand.onOpenFarmHands(self, actionName, inputValue)
     FarmHandsDialog.show()
-end
-
---- TEMP debug trigger: hire the first candidate in the pool. Removed once the
---- K panel wires hiring through the GUI.
-function FarmHand.onHireFirstCandidate(self, actionName, inputValue)
-    local manager = FarmHand.manager
-    if manager == nil then
-        return
-    end
-    -- TEMP: refill an empty pool so repeated presses keep hiring without waiting
-    -- for a month tick. The real GUI slice refills only on the monthly schedule.
-    if manager.candidates[1] == nil then
-        print("FarmHand [DEBUG]: pool empty -> regenerating candidates") -- TEMP DEBUG
-        manager:generateCandidates()
-    end
-    local candidate = manager.candidates[1]
-    if candidate ~= nil then
-        manager:hireCandidate(candidate.id)
-    end
 end
 
 --- Tear the manager down when the mission ends so a fresh game starts clean.

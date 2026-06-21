@@ -41,8 +41,12 @@ end
 function FarmHandsDialog.new(target, customMt)
     local self = MessageDialog.new(target, customMt or FarmHandsDialog_mt)
 
-    -- Roster snapshot for the list, rebuilt on each show.
-    self.hands = {}
+    -- Snapshots for the list, rebuilt on each show / mode switch / hire.
+    self.hands = {}      -- roster (HANDS view)
+    self.candidates = {} -- hire pool (HIRE view)
+
+    -- Current view: "hands" (roster, click = set active) or "hire" (pool, click = hire).
+    self.mode = "hands"
 
     return self
 end
@@ -56,27 +60,59 @@ function FarmHandsDialog.show()
         return
     end
 
-    -- Rebuild the roster snapshot, then reload the list element directly.
-    -- reloadData() lives on the SmoothList element (self.handList), not on the
-    -- dialog itself.
-    local manager = FarmHand.manager
-    dialog.hands = manager ~= nil and manager:getWorkersList() or {}
-    if dialog.handList ~= nil then
-        dialog.handList:reloadData()
+    -- Always open on the HANDS view. refreshContents rebuilds the snapshot,
+    -- reloads the SmoothList (self.handList), and sets the toggle label + selection.
+    dialog.mode = "hands"
+    dialog:refreshContents()
 
-        -- Put the list selection (the green highlight) on the active hand's row
-        -- instead of defaulting to row 0.
-        local activeIndex = 1
-        for i, hand in ipairs(dialog.hands) do
+    g_gui:showDialog("FarmHandsDialog")
+end
+
+--- Rebuild the displayed list for the current mode, reload the SmoothList, and
+--- update the toggle-button label. Used on open, on mode toggle, and after a hire.
+function FarmHandsDialog:refreshContents()
+    local manager = FarmHand.manager
+
+    if self.mode == "hire" then
+        self.candidates = manager ~= nil and manager.candidates or {}
+    else
+        self.hands = manager ~= nil and manager:getWorkersList() or {}
+    end
+
+    -- The toggle button is labelled by the view it switches TO.
+    if self.modeButton ~= nil then
+        local key = self.mode == "hire" and "farmhand_ui_view_hands" or "farmhand_ui_view_hire"
+        self.modeButton:setText(g_i18n:getText(key))
+    end
+
+    if self.handList == nil then
+        return
+    end
+    self.handList:reloadData()
+
+    -- Highlight the active hand in HANDS view, the first candidate in HIRE. When
+    -- the hire pool is empty (only the placeholder row) select nothing, so the
+    -- placeholder is not rendered as a green selected row.
+    if self.mode == "hire" then
+        if #self.candidates > 0 then
+            self.handList:setSelectedItem(1, 1)
+        end
+    else
+        local selectIndex = 1
+        for i, hand in ipairs(self.hands) do
             if manager ~= nil and hand.id == manager.activeHandId then
-                activeIndex = i
+                selectIndex = i
                 break
             end
         end
-        dialog.handList:setSelectedItem(1, activeIndex)
+        self.handList:setSelectedItem(1, selectIndex)
     end
+end
 
-    g_gui:showDialog("FarmHandsDialog")
+--- Toggle between the roster (HANDS) and the hire pool (HIRE) views.
+function FarmHandsDialog:onClickToggleMode()
+    self.mode = self.mode == "hire" and "hands" or "hire"
+    self:refreshContents()
 end
 
 function FarmHandsDialog:onGuiSetupFinished()
@@ -91,6 +127,10 @@ end
 -- ---- SmoothList data source ------------------------------------------------
 
 function FarmHandsDialog:getNumberOfItemsInSection(list, section)
+    if self.mode == "hire" then
+        -- At least one row so the "no candidates" placeholder can render.
+        return math.max(1, #self.candidates)
+    end
     return #self.hands
 end
 
@@ -99,10 +139,22 @@ function FarmHandsDialog:getTitleForSectionHeader(list, section)
 end
 
 function FarmHandsDialog:populateCellForItemInSection(list, section, index, cell)
+    if self.mode == "hire" then
+        self:populateCandidateCell(index, cell)
+    else
+        self:populateHandCell(index, cell)
+    end
+end
+
+--- Populate a roster row (HANDS view): name, certificate summary, active marker.
+function FarmHandsDialog:populateHandCell(index, cell)
     local hand = self.hands[index]
     if hand == nil then
         return
     end
+
+    -- Re-enable in case this cell was the disabled hire placeholder on a prior load.
+    cell:setDisabled(false)
 
     local nameEl = cell:getAttribute("name")
     if nameEl ~= nil then
@@ -139,11 +191,58 @@ function FarmHandsDialog:populateCellForItemInSection(list, section, index, cell
     end
 end
 
+--- Populate a candidate row (HIRE view), or the empty-pool placeholder when the
+--- pool is empty (a single dimmed "no candidates this month" row).
+function FarmHandsDialog:populateCandidateCell(index, cell)
+    local nameEl = cell:getAttribute("name")
+    local certsEl = cell:getAttribute("certs")
+    local activeEl = cell:getAttribute("active")
+    if activeEl ~= nil then
+        activeEl:setText("")
+    end
+
+    local candidate = self.candidates[index]
+    if candidate == nil then
+        -- Empty-pool placeholder: disabled so it greys out and is non-selectable
+        -- (no green highlight), and clicks are ignored.
+        cell:setDisabled(true)
+        if nameEl ~= nil then
+            nameEl:setText(g_i18n:getText("farmhand_ui_no_candidates"))
+            nameEl:setTextColor(0.5, 0.5, 0.5, 1)
+        end
+        if certsEl ~= nil then
+            certsEl:setText("")
+        end
+        return
+    end
+
+    -- Real candidate row: re-enable (cells are reused across reloads).
+    cell:setDisabled(false)
+    if nameEl ~= nil then
+        nameEl:setText(candidate.name)
+        nameEl:setTextColor(1, 1, 1, 1)
+    end
+    if certsEl ~= nil then
+        certsEl:setText(g_i18n:getText("farmhand_ui_available"))
+        certsEl:setTextColor(0.85, 0.85, 0.85, 1)
+    end
+end
+
 -- ---- Interaction -----------------------------------------------------------
 
---- Click a hand row -> make that hand the active hand.
+--- Click a list row. HANDS view -> set that hand active; HIRE view -> hire that
+--- candidate. Dispatched by mode so the one SmoothList serves both views.
 function FarmHandsDialog:onClickHand(item)
     local index = item.indexInSection or (self.handList ~= nil and self.handList.selectedIndex)
+    if index == nil then
+        return
+    end
+
+    if self.mode == "hire" then
+        self:hireAtIndex(index)
+        return
+    end
+
     local hand = self.hands[index]
     if hand == nil then
         return
@@ -157,6 +256,22 @@ function FarmHandsDialog:onClickHand(item)
     self.handList:reloadData()
     -- Keep the green selection on the row just made active (reload can reset it).
     self.handList:setSelectedItem(1, index)
+end
+
+--- Hire the candidate at the given row, then stay in HIRE view and refresh the
+--- now-smaller pool so the player can keep hiring. No-op on the placeholder row.
+function FarmHandsDialog:hireAtIndex(index)
+    local candidate = self.candidates[index]
+    if candidate == nil then
+        return -- placeholder row; nothing to hire
+    end
+
+    local manager = FarmHand.manager
+    if manager ~= nil then
+        manager:hireCandidate(candidate.id)
+    end
+
+    self:refreshContents()
 end
 
 function FarmHandsDialog:onListSelectionChanged(list, section, index)
