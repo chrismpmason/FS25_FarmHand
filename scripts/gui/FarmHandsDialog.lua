@@ -236,8 +236,16 @@ function FarmHandsDialog:populateCandidateCell(index, cell)
         nameEl:setText(candidate.name)
         nameEl:setTextColor(1, 1, 1, 1)
     end
+    -- Show what you're buying: tier · grade · monthly wage (computed from the
+    -- candidate's seeded XP + cert, same display pattern as the Hands view).
     if certsEl ~= nil then
-        certsEl:setText(g_i18n:getText("farmhand_ui_available"))
+        local mgr = FarmHand.manager
+        if mgr ~= nil then
+            certsEl:setText(string.format("%s · %s £%d",
+                mgr:getTierName(candidate), mgr:getGradeName(candidate), mgr:getWorkerMonthlyWage(candidate)))
+        else
+            certsEl:setText("")
+        end
         certsEl:setTextColor(0.85, 0.85, 0.85, 1)
     end
 end

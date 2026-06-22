@@ -39,6 +39,19 @@ FarmHandManager.TIER_EXP_MASTER = 400      -- Experienced -> Master
 -- working passes only (see FarmHandSpeed). Tunable.
 FarmHandManager.TIER_SPEED_FACTOR = { 0.6, 0.8, 1.0 }
 
+-- Hire-pool generation: candidates roll varied starting experience (and sometimes
+-- a pre-earned cert) so the pool is a build-vs-buy choice, not all-green. Weighted
+-- tier bucket, then a uniform XP roll within that tier's band, then a per-tier
+-- chance of the skilled cert. Bands tie to the TIER_EXP_* thresholds so they stay
+-- consistent if those move. All tunable.
+FarmHandManager.CANDIDATE_TIER_WEIGHTS = { 0.60, 0.30, 0.10 } -- Novice / Experienced / Master
+FarmHandManager.CANDIDATE_XP_BANDS = {
+    { 0, FarmHandManager.TIER_EXP_EXPERIENCED - 1 },                               -- Novice: 0..49
+    { FarmHandManager.TIER_EXP_EXPERIENCED, FarmHandManager.TIER_EXP_MASTER - 1 }, -- Experienced: 50..399
+    { FarmHandManager.TIER_EXP_MASTER, FarmHandManager.TIER_EXP_MASTER + 250 },    -- Master: 400..650
+}
+FarmHandManager.CANDIDATE_PRECERT_CHANCE = { 0.0, 0.25, 0.60 } -- skilled-cert chance by tier
+
 -- Certificates that gate the skilled grades (3-4). A small list so adding certs
 -- later is trivial. FarmHandCertificate is defined in the worker module (loaded
 -- before this one).
@@ -468,27 +481,58 @@ function FarmHandManager:makeCandidateName(isMale)
     return first .. " " .. last
 end
 
---- Replace the hire pool with n freshly generated green candidates, each with a
---- random gender, a gender-matched name, and a unique runtime id.
+--- Roll a 1-based tier index from a weighted table (weights sum ~1). Uses the
+--- two-arg integer form math.random(1, 100): the no-arg math.random() proved
+--- unreliable in-engine (every candidate rolled the same tier), whereas the
+--- two-arg form works (as the XP roll shows). Compare against the cumulative
+--- weight scaled to 1..100.
+local function rollWeightedTier(weights)
+    local r = math.random(1, 100)
+    local acc = 0
+    for tier = 1, #weights do
+        acc = acc + weights[tier]
+        if r <= acc * 100 then
+            return tier
+        end
+    end
+    return #weights
+end
+
+--- Replace the hire pool with n freshly generated candidates. Each rolls a
+--- weighted starting tier, a uniform XP within that tier's band, and a per-tier
+--- chance of a pre-earned skilled cert — so the pool spans green Trainees to the
+--- occasional certified veteran. Candidates are full FarmHandWorker objects so
+--- tier/grade/wage compute directly (for the Hire view) and carry into the roster
+--- unchanged on hire.
 function FarmHandManager:generateCandidates(n)
     n = n or 3
     self.candidates = {}
     for _ = 1, n do
         self.candidateCounter = self.candidateCounter + 1
-        local isMale = math.random() < 0.5
-        local candidate = {
-            id = "cand_" .. self.candidateCounter,
-            name = self:makeCandidateName(isMale),
-            isMale = isMale,
-        }
+        local isMale = math.random(1, 2) == 1 -- two-arg form (no-arg math.random() is unreliable in-engine)
+
+        local candidate = FarmHandWorker.new("cand_" .. self.candidateCounter, self:makeCandidateName(isMale))
+        candidate.isMale = isMale
+
+        -- Seed starting experience: weighted tier bucket -> uniform XP in band.
+        local tier = rollWeightedTier(FarmHandManager.CANDIDATE_TIER_WEIGHTS)
+        local band = FarmHandManager.CANDIDATE_XP_BANDS[tier]
+        candidate.hectaresWorked = math.random(band[1], band[2])
+
+        -- Pre-cert chance scales with tier (higher tiers more likely qualified).
+        -- Two-arg integer form (no-arg math.random() is unreliable in-engine).
+        if math.random(1, 100) <= (FarmHandManager.CANDIDATE_PRECERT_CHANCE[tier] or 0) * 100 then
+            candidate:grantCertificate(FarmHandCertificate.PESTICIDES)
+        end
+
         self.candidates[#self.candidates + 1] = candidate
     end
 end
 
---- Hire a candidate by id: create a green worker from it, add it to the roster,
---- assign its driver identity now, and remove it from the pool. Returns the new
---- worker, or nil if no such candidate. v1: no recruitment fee (wages are the
---- cost); the candidate pool is not persisted.
+--- Hire a candidate by id: create the roster hand carrying the candidate's seeded
+--- starting experience and certs, add it to the roster, assign its driver identity
+--- now, and remove it from the pool. Returns the new worker, or nil if no such
+--- candidate. v1: no recruitment fee (wages are the cost); the pool is not saved.
 function FarmHandManager:hireCandidate(candidateId)
     local index, candidate
     for i, c in ipairs(self.candidates) do
@@ -508,10 +552,16 @@ function FarmHandManager:hireCandidate(candidateId)
         workerId = "hire_" .. self.hireCounter
     until self.workers[workerId] == nil
 
-    -- Green by construction: FarmHandWorker.new() defaults 0 hectares, no certs,
-    -- no course and the standard base wage. Only identity comes from the candidate.
+    -- Carry the candidate's identity AND its seeded starting experience + certs.
+    -- FarmHandWorker.new() starts green (0 ha, no certs); we overwrite from the
+    -- candidate so the rolled XP/cert ride into the roster unchanged (and persist
+    -- via the existing hectaresWorked/certificate save).
     local worker = FarmHandWorker.new(workerId, candidate.name)
     worker.isMale = candidate.isMale
+    worker.hectaresWorked = candidate.hectaresWorked or 0
+    for certId in pairs(candidate.certificates) do
+        worker:grantCertificate(certId)
+    end
 
     self:addWorker(worker)
     self:registerHelperForHand(worker)
