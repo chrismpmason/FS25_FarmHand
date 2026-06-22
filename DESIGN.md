@@ -305,7 +305,42 @@ should climb and whether to cap how many top tickets one hand can hold.
 
 ---
 
-## 10. Status
+## 10. Panel UI: full-screen tabbed shell (PLANNED — build 2, before College)
+
+The current K panel is a small 5-row dialog with a Hands/Hire mode toggle. It's at capacity —
+tier+grade+wage already crowd one cell, and College has no home in it. Replace it with a
+full-screen frame with left-hand nav tabs swapping content panes. This is a REBUILD of the
+presentation layer, not a tweak — new frame architecture, tab switching, and porting each
+existing view across. All manager logic (roster, hiring, wages, tiers, dismiss, persistence)
+stays unchanged — this is pure presentation, so layout risk only, no data risk.
+
+Tabs:
+
+- **Roster** — employed crew: select active, dismiss, per-hand tier/grade/wage/experience
+  (today's Hands view).
+- **Hire** — the candidate pool (tiered random hiring), with room to show each candidate's
+  tier/grade/wage properly instead of cramped rows.
+- **College** — enrol hands on courses, tuition, who's training and time remaining (the build-2
+  College feature lives here; the shell is what gives College its UI real estate).
+- **Overview / Stats** — company dashboard: total monthly payroll, headcount, active vs idle vs
+  currently-working, certified count, courses in progress. The ETS2 "company manager" feel —
+  turns the panel from "manage one hand" into "run a workforce".
+
+Build approach (de-risked, given the GUI fragility this project has hit — footer reflow, dialog
+stacking, button registration):
+
+- Build the EMPTY shell first: full-screen frame + left tabs switching between blank panes.
+  Verify it renders and switches cleanly BEFORE porting any content.
+- Then port each existing view (Roster, Hire) into its tab one at a time, verifying each.
+- Incremental, not big-bang. No manager/logic changes.
+
+Sequencing: this is the OPENING move of build 2 — build the shell first, then build College INTO
+it as a tab (rather than cramming College into the old toggle and rebuilding around it later).
+Do not start until tiered random hiring is committed and the current test build's feedback is in.
+
+---
+
+## 11. Status
 
 **Built & committed**
 
@@ -330,7 +365,7 @@ should climb and whether to cap how many top tickets one hand can hold.
 
 ---
 
-## 11. Suggested build order
+## 12. Suggested build order
 
 1. **Specialisation model + AI-job speed effect** — generalises the gate and the experience
    idea in one slice.
@@ -345,7 +380,7 @@ should climb and whether to cap how many top tickets one hand can hold.
 
 ---
 
-## 12. Implementation notes & risks
+## 13. Implementation notes & risks
 
 - **Courseplay integration is a large dependency** with its own API. The basegame AI worker
   is the tractable target and is what the certificate gate already hooks. Build everything on
@@ -360,7 +395,7 @@ should climb and whether to cap how many top tickets one hand can hold.
 
 ---
 
-## 13. Conventions
+## 14. Conventions
 
 - Keep the two axes distinct: **certificates/tickets = legal gates; specialisations =
   proficiency.** Never merge them.
