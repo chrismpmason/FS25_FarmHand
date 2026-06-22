@@ -27,6 +27,14 @@ FarmHandManager.GRADE_NAMES = { "Trainee", "Farm worker", "Skilled operator", "S
 FarmHandManager.GRADE_EXP_MID = 50   -- "experienced"
 FarmHandManager.GRADE_EXP_HIGH = 200 -- "highly experienced"
 
+-- Proficiency tiers (ETS2-style leveling): a SEPARATE axis from pay grade, though
+-- both read the same experience value (hectaresWorked). Escalating thresholds —
+-- Experienced is a moderate grind, Master is several times that, so maxing takes
+-- real time. Tunable; calibrated to the ~1 XP/hectare-swept accrual rate.
+FarmHandManager.TIER_NAMES = { "Novice", "Experienced", "Master" }
+FarmHandManager.TIER_EXP_EXPERIENCED = 50  -- Novice -> Experienced
+FarmHandManager.TIER_EXP_MASTER = 400      -- Experienced -> Master
+
 -- Certificates that gate the skilled grades (3-4). A small list so adding certs
 -- later is trivial. FarmHandCertificate is defined in the worker module (loaded
 -- before this one).
@@ -556,6 +564,45 @@ end
 --- The worker's grade display name.
 function FarmHandManager:getGradeName(worker)
     return FarmHandManager.GRADE_NAMES[self:getGrade(worker)] or "?"
+end
+
+-- ---- Proficiency tier (the leveling axis; drives the speed output next slice) --
+
+--- The worker's proficiency tier (1=Novice, 2=Experienced, 3=Master), computed
+--- from experience. Not persisted; recomputed on demand.
+function FarmHandManager:getTier(worker)
+    local exp = worker.hectaresWorked or 0
+    if exp >= FarmHandManager.TIER_EXP_MASTER then
+        return 3
+    elseif exp >= FarmHandManager.TIER_EXP_EXPERIENCED then
+        return 2
+    end
+    return 1
+end
+
+--- The worker's tier display name.
+function FarmHandManager:getTierName(worker)
+    return FarmHandManager.TIER_NAMES[self:getTier(worker)] or "?"
+end
+
+--- Fraction (0..1) of progress toward the next tier. Master is capped at 1.
+function FarmHandManager:getTierProgress(worker)
+    local exp = worker.hectaresWorked or 0
+    local tier = self:getTier(worker)
+    if tier >= 3 then
+        return 1
+    end
+
+    local lo, hi
+    if tier == 1 then
+        lo, hi = 0, FarmHandManager.TIER_EXP_EXPERIENCED
+    else
+        lo, hi = FarmHandManager.TIER_EXP_EXPERIENCED, FarmHandManager.TIER_EXP_MASTER
+    end
+    if hi <= lo then
+        return 1
+    end
+    return math.max(0, math.min(1, (exp - lo) / (hi - lo)))
 end
 
 --- A single hand's monthly wage: the grade rate, floored at the legal NMW

@@ -165,14 +165,22 @@ function FarmHandsDialog:populateHandCell(index, cell)
         nameEl:setText(hand.name)
     end
 
-    -- Grade + monthly wage (the grade name conveys cert status: skilled grades
-    -- 3-4 require the skilled certificate). Text-only; no layout change.
+    -- Proficiency tier + progress (the ETS2 leveling), then grade + wage. Text-only;
+    -- no layout change. The grade name conveys cert status (skilled grades 3-4
+    -- require the skilled certificate).
     local certsEl = cell:getAttribute("certs")
     if certsEl ~= nil then
         local mgr = FarmHand.manager
         if mgr ~= nil then
-            certsEl:setText(string.format("%s · £%d/mo",
-                mgr:getGradeName(hand), mgr:getWorkerMonthlyWage(hand)))
+            local tierText
+            if mgr:getTier(hand) >= 3 then
+                tierText = mgr:getTierName(hand) -- "Master" (capped, no progress)
+            else
+                tierText = string.format("%s %d%%", mgr:getTierName(hand),
+                    math.floor(mgr:getTierProgress(hand) * 100 + 0.5))
+            end
+            certsEl:setText(string.format("%s · %s £%d",
+                tierText, mgr:getGradeName(hand), mgr:getWorkerMonthlyWage(hand)))
         else
             certsEl:setText("")
         end
