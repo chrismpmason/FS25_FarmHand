@@ -75,6 +75,25 @@ function FarmHand:onMissionLoad(mission)
     -- finalizes vehicle types before FarmHand even loads). The AI-job hooks use
     -- this to decide between the ADS per-instance override and the vanilla path.
     FarmHandWear.adsPresent = g_modIsLoaded ~= nil and g_modIsLoaded["FS25_AdvancedDamageSystem"] == true
+
+    FarmHand.warnOnConflictingHelperMods()
+end
+
+--- Warn (once at mission start) if another hired-worker manager is loaded.
+--- FarmHand drives helpers directly (AI job hooks, the active hand, wage), so a
+--- second helper manager can stop a job starting or hand it to the wrong system.
+--- Substring-matched on "HiredHelper" so it catches the mod regardless of its
+--- exact registered name.
+function FarmHand.warnOnConflictingHelperMods()
+    if g_modIsLoaded == nil then
+        return
+    end
+    for modName, loaded in pairs(g_modIsLoaded) do
+        if loaded == true and type(modName) == "string" and modName:find("HiredHelper", 1, true) then
+            Logging.warning("FarmHand: '%s' is also loaded. Both manage hired workers; run only one helper manager or a hand may not start its job.", modName)
+            return
+        end
+    end
 end
 
 --- Append to base AIJob.start. Two jobs in one:
