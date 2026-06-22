@@ -150,7 +150,7 @@ function FarmHandsDialog:populateCellForItemInSection(list, section, index, cell
     end
 end
 
---- Populate a roster row (HANDS view): name, certificate summary, active marker.
+--- Populate a roster row (HANDS view): name, grade + monthly wage, active marker.
 function FarmHandsDialog:populateHandCell(index, cell)
     local hand = self.hands[index]
     if hand == nil then
@@ -165,15 +165,17 @@ function FarmHandsDialog:populateHandCell(index, cell)
         nameEl:setText(hand.name)
     end
 
-    -- Certificate summary (just pesticides for now).
-    local certs = {}
-    if hand:hasCertificate(FarmHandCertificate.PESTICIDES) then
-        certs[#certs + 1] = "PESTICIDES"
-    end
-    local certText = #certs > 0 and table.concat(certs, ", ") or g_i18n:getText("farmhand_ui_certs_none")
+    -- Grade + monthly wage (the grade name conveys cert status: skilled grades
+    -- 3-4 require the skilled certificate). Text-only; no layout change.
     local certsEl = cell:getAttribute("certs")
     if certsEl ~= nil then
-        certsEl:setText(certText)
+        local mgr = FarmHand.manager
+        if mgr ~= nil then
+            certsEl:setText(string.format("%s · £%d/mo",
+                mgr:getGradeName(hand), mgr:getWorkerMonthlyWage(hand)))
+        else
+            certsEl:setText("")
+        end
     end
 
     -- Active marker.

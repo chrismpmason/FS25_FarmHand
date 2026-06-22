@@ -14,9 +14,23 @@
 
 FarmHandManager = {}
 
--- Per-certificate monthly wage premium added on top of a hand's base wage
--- (first-pass placeholder for balancing).
-FarmHandManager.CERT_WAGE_PREMIUM = 500
+-- Grade-based pay. Grade (1-4) is COMPUTED from a hand's certs + experience each
+-- time wage is calculated (never persisted), so hands promote automatically as
+-- they earn certs and hours. Monthly rates and names are tunable constants; the
+-- NMW floor (settings) is applied on top so no grade can pay below the legal min.
+FarmHandManager.GRADE_RATES = { 2150, 2250, 2450, 2650 } -- monthly £, index = grade
+FarmHandManager.GRADE_NAMES = { "Trainee", "Farm worker", "Skilled operator", "Senior hand" }
+
+-- Experience thresholds (in hectaresWorked, the existing experience measure) that
+-- promote within a tier: 1->2 (uncertificated) and 3->4 (certificated). Tuned for
+-- a few months of work, not glacial.
+FarmHandManager.GRADE_EXP_MID = 50   -- "experienced"
+FarmHandManager.GRADE_EXP_HIGH = 200 -- "highly experienced"
+
+-- Certificates that gate the skilled grades (3-4). A small list so adding certs
+-- later is trivial. FarmHandCertificate is defined in the worker module (loaded
+-- before this one).
+local SKILLED_CERTS = { FarmHandCertificate.PESTICIDES }
 
 local FarmHandManager_mt = Class(FarmHandManager)
 
@@ -517,10 +531,38 @@ end
 -- Wages.
 -- =========================================================================
 
---- A single hand's monthly wage: base plus a premium per certificate held.
---- (Experience scaling comes with the experience/wear slice.)
+--- True if the worker holds any skilled (grade-gating) certificate.
+function FarmHandManager:hasSkilledCert(worker)
+    for _, certId in ipairs(SKILLED_CERTS) do
+        if worker:hasCertificate(certId) then
+            return true
+        end
+    end
+    return false
+end
+
+--- The worker's computed employment grade (1-4), from certs + experience. Not
+--- persisted; recomputed on demand so promotion tracks experience/cert growth.
+--- A skilled cert gates the skilled grades (3-4); experience promotes within a
+--- tier (1->2 uncertificated, 3->4 certificated).
+function FarmHandManager:getGrade(worker)
+    local exp = worker.hectaresWorked or 0
+    if not self:hasSkilledCert(worker) then
+        return exp >= FarmHandManager.GRADE_EXP_MID and 2 or 1
+    end
+    return exp >= FarmHandManager.GRADE_EXP_HIGH and 4 or 3
+end
+
+--- The worker's grade display name.
+function FarmHandManager:getGradeName(worker)
+    return FarmHandManager.GRADE_NAMES[self:getGrade(worker)] or "?"
+end
+
+--- A single hand's monthly wage: the grade rate, floored at the legal NMW
+--- minimum. Grade is computed at call time, so hands promote automatically.
 function FarmHandManager:getWorkerMonthlyWage(worker)
-    return worker.baseWage + worker:getCertificateCount() * FarmHandManager.CERT_WAGE_PREMIUM
+    local rate = FarmHandManager.GRADE_RATES[self:getGrade(worker)] or 0
+    return math.max(rate, self.settings:getNmwFloorMonthly())
 end
 
 -- =========================================================================
@@ -581,39 +623,42 @@ function FarmHandManager:payWages()
         return
     end
 
-    -- Crib of Employment's monthly salary deduction: record the change for the
-    -- finance stats, then move the farm balance.
-    local moneyType = MoneyType.WAGES or MoneyType.OTHER
+    -- Pay the whole roster as a single deduction. addMoney does the balance move,
+    -- the finance-stat record and the on-screen change in one call; MoneyType.AI
+    -- puts it on the hired-labour ("Wages") Finances line — the same line the
+    -- suppressed per-job helper fee used to hit, so labour reads as one cost.
+    --
+    -- CRITICAL: wrap in the passthrough flag. Our helper-fee suppression eats
+    -- MoneyType.AI charges while a hand is mid-job; without this guard a salary
+    -- paid during a running job at the month rollover would be suppressed too.
+    local moneyType = MoneyType.AI or MoneyType.WAGES or MoneyType.OTHER
 
-    -- Passthrough guard so the helper-cost suppression hook never touches our own
-    -- deduction (belt-and-suspenders; wages are MoneyType.WAGES, not AI anyway).
     self.moneyPassthrough = true
-    g_currentMission:addMoneyChange(-total, farm:getId(), moneyType, true)
-    farm:changeBalance(-total, moneyType)
+    g_currentMission:addMoney(-total, farm:getId(), moneyType, true, true)
     self.moneyPassthrough = false
 end
 
---- 4. For each worker, roll the leave-risk. The more a hand's market wage
---- exceeds what the farm pays them, the likelier they quit. A hand who quits
---- mid-course loses their in-progress course progress.
+--- 4. For each worker, roll the leave-risk against their GRADE rate benchmark
+--- (what their grade is worth). They quit when paid below it. This slice pays
+--- exactly the grade rate (no player-set offer yet), so the gap is always 0 and
+--- no one quits — this is plumbing for the wage-negotiations slice, which adds an
+--- offered wage that can fall below the benchmark. A hand who quits mid-course
+--- loses their in-progress course progress.
 function FarmHandManager:runRetentionCheck()
     local settings = self.settings
     local sensitivity = settings:getRetentionSensitivity()
     local maxChance = settings:getMaxMonthlyQuitChance()
-    local certBonus = settings:getMarketCertBonus()
-    local expBonus = settings:getMarketExpBonus()
-    local expK = settings:getMarketExpK()
 
     -- Collect quitters first; don't mutate the roster while iterating it.
     local quitters = {}
     for id, worker in pairs(self.workers) do
-        local paidWage = self:getWorkerMonthlyWage(worker)
-        local marketWage = worker:getMarketWage(certBonus, expBonus, expK)
-        local gap = worker:getPayGap(paidWage, certBonus, expBonus, expK)
+        local benchmark = self:getWorkerMonthlyWage(worker) -- the fair grade rate
+        local paidWage = benchmark                          -- == grade rate until negotiations land
+        local gap = math.max(0, benchmark - paidWage)
 
         local quitChance = 0
-        if marketWage > 0 then
-            quitChance = math.min(maxChance, math.max(0, sensitivity * gap / marketWage))
+        if benchmark > 0 then
+            quitChance = math.min(maxChance, math.max(0, sensitivity * gap / benchmark))
         end
 
         if math.random() < quitChance then

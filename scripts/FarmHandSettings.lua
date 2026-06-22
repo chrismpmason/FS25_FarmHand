@@ -19,6 +19,12 @@ function FarmHandSettings.new()
 
     self.wageMultiplier = 1.0
 
+    -- National Minimum Wage floor inputs. nmwHourly is the April 2026 21+ rate;
+    -- weeklyHours is the agricultural standard week. The monthly floor is derived
+    -- (see getNmwFloorMonthly). Both annually updatable.
+    self.nmwHourly = 12.71
+    self.weeklyHours = 39
+
     -- When ON (default), the monthly salary REPLACES the vanilla per-job helper
     -- fee: that fee is suppressed while a FarmHand does the work, so labour is
     -- paid for once (the salary), not twice. Toggle OFF to pay both.
@@ -60,6 +66,19 @@ end
 
 function FarmHandSettings:getWageMultiplier()
     return self.wageMultiplier
+end
+
+function FarmHandSettings:getNmwHourly()
+    return self.nmwHourly
+end
+
+function FarmHandSettings:getWeeklyHours()
+    return self.weeklyHours
+end
+
+--- The legal monthly wage floor: NMW hourly x weekly hours x 52 weeks / 12 months.
+function FarmHandSettings:getNmwFloorMonthly()
+    return self.nmwHourly * self.weeklyHours * 52 / 12
 end
 
 function FarmHandSettings:getSalaryReplacesHelperCost()
