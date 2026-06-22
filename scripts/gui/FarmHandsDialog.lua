@@ -301,6 +301,49 @@ function FarmHandsDialog:onListSelectionChanged(list, section, index)
     -- Selection highlight only; activation happens on click.
 end
 
+--- Dismiss the selected hand (HANDS view only). Destructive — the hand's
+--- experience, certificates and course progress are lost — so confirm first via
+--- a YesNoDialog. The target id is stashed on self so the callback doesn't depend
+--- on the dialog's arg-passing shape.
+function FarmHandsDialog:onClickDismiss()
+    if self.mode ~= "hands" then
+        return -- dismiss is a Hands-view action; no-op while viewing candidates
+    end
+
+    local index = self.handList ~= nil and self.handList.selectedIndex or nil
+    local hand = index ~= nil and self.hands[index] or nil
+    if hand == nil then
+        return -- nothing selected (e.g. empty roster)
+    end
+
+    self.pendingDismissId = hand.id
+    -- FS25 10.0.0: YesNoDialog.show(callback, target, text, ...) is the real API
+    -- (there is no g_gui:showYesNoDialog). target=self -> callback fires as
+    -- self:onDismissConfirmed(yes).
+    YesNoDialog.show(
+        self.onDismissConfirmed,
+        self,
+        string.format("Dismiss %s? Their experience, certificates and course progress will be lost.", hand.name))
+end
+
+--- YesNoDialog callback. On confirm, drop the stashed hand via the manager's
+--- existing removeWorker (handles roster removal, course clear, active-hand
+--- reassignment) and refresh the panel.
+function FarmHandsDialog:onDismissConfirmed(yes)
+    local handId = self.pendingDismissId
+    self.pendingDismissId = nil
+    if not yes or handId == nil then
+        return
+    end
+
+    local manager = FarmHand.manager
+    if manager ~= nil then
+        manager:removeWorker(handId)
+    end
+
+    self:refreshContents()
+end
+
 function FarmHandsDialog:onClickBack()
     self:close()
 end

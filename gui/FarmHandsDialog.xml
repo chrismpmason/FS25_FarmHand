@@ -39,6 +39,10 @@
                  footer glyph instead of inheriting buttonBack's MENU_BACK (ESC), so
                  ESC stays bound to Back alone. Label is set in Lua per destination. -->
             <Button profile="buttonBack" inputAction="MENU_EXTRA_1" text="$l10n_farmhand_ui_view_hire" onClick="onClickToggleMode" id="modeButton"/>
+            <!-- Dismiss the selected hand (Hands view only; gated in the handler). Own
+                 footer action (MENU_EXTRA_2), distinct from the row tap that sets active.
+                 Literal text for now to keep this slice off modDesc's l10n. -->
+            <Button profile="buttonBack" inputAction="MENU_EXTRA_2" text="Dismiss" onClick="onClickDismiss" id="dismissButton"/>
             <Button profile="buttonBack" text="$l10n_button_back" onClick="onClickBack" id="backButton"/>
         </BoxLayout>
     </GuiElement>
