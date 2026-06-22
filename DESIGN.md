@@ -93,6 +93,20 @@ on a course:
 Example ladder (maps to real UK qualifications): pesticide ticket → telehandler ticket →
 Level 2 general farm worker → Level 3 technician → Level 4/5 manager (can supervise others).
 
+### Machinery-ticket research (planned)
+
+UK reality is tickets, not degrees — and most fieldwork needs none. Three bands:
+
+- **No ticket legally required** for tractor/combine fieldwork on private land — the bulk of the
+  work. A hand can do it green; experience (tiers) makes them better, but nothing gates it.
+- **Competence tickets expected** for telehandler / ATV / chainsaw (LANTRA / NPORS). Not a legal
+  licence — insurance- and employer-driven — but the real-world norm. Model as skilled tickets.
+- **Legally mandatory** PA1 + PA2 (boom) / PA6 (knapsack) for spraying — already the pesticide
+  gate, the only hard legal block.
+
+Intent: a skilled ticket lifts a hand into a higher pay grade (ties into the grade model in §6);
+most fieldwork needs none, so the ungated baseline stays the common case.
+
 ---
 
 ## 5. Experience & "learn from the master"
@@ -128,6 +142,34 @@ of ADS's fields — one-owner respected.
   Do not re-attempt the class-wrap.
 - extraConditionWear is ADS-owned (breakdown effects write/reset it) — left untouched.
 - Without ADS: vanilla applyToCombination path, unchanged.
+
+### Experience tiers — IMPLEMENTED (8393388)
+
+Three proficiency tiers — Novice / Experienced / Master — computed from the single experience
+value (hectaresWorked), never persisted. Thresholds TIER_EXP_EXPERIENCED = 50 ha,
+TIER_EXP_MASTER = 400 ha — a long-but-achievable grind at the ~1 XP/hectare-swept accrual rate.
+getTier / getTierName / getTierProgress drive the K-panel display and the work-speed lever.
+
+- Tier (proficiency) and grade (pay) are DELIBERATELY distinct axes reading the same XP value:
+  tier thresholds 50/400 vs grade thresholds 50/200. They must never collapse into one number —
+  proficiency makes a hand faster, grade sets what they cost.
+
+### Proficiency → work speed — IMPLEMENTED (8d5ad47)
+
+A Novice works a field slower than a Master. Per-instance wrap on the ROOT vehicle's
+getSpeedLimit, scaling the returned limit by TIER_SPEED_FACTOR {0.6 / 0.8 / 1.0}
+(Novice/Experienced/Master). Applied at job start, removed at job end — restoring the CAPTURED
+ORIGINAL, not nil (the ADS cleanup lesson). Reuses the ADS per-instance override pattern.
+
+Two load-bearing decisions — do not undo:
+
+- **Root-only.** The root's getSpeedLimit already aggregates attached tools' working limits (min);
+  wrapping implements too would re-scale an already-scaled child value (factor^2).
+- **Working-only gate.** Scaling is gated on getIsFieldWorkActive(), so only the working passes
+  slow — headland turns / transit return the transport limit and stay full speed. This protects
+  the fragile headland turning we already saw vanilla AI struggle with.
+- As with ADS, this MUST be a per-instance override, not a class-level wrap (same load-order race).
+  Do not re-attempt the class-wrap.
 
 ---
 
@@ -190,6 +232,17 @@ anchored to the real UK floor, and the per-cert structure isn't how UK ag pay wo
 - **Ag-specific extras (optional realism layer):** night-work premium (7pm–6am), weekly
   allowance per working dog kept, accommodation offset if housed, on-call allowance,
   apprentice rates pegged to a grade, agricultural sick pay at the minimum wage.
+
+### Grade-based wages + NMW floor — IMPLEMENTED (c3ca7a6)
+
+Replaces the old flat base + £500/cert with grade-based pay, building on the wage-realism
+grounding above. Grade (1-4: Trainee / Farm worker / Skilled operator / Senior hand) is COMPUTED
+from certs + experience each pay tick, never persisted: a skilled certificate gates the skilled
+grades 3-4; experience promotes within a tier. Monthly wage = grade rate {2150/2250/2450/2650},
+floored at the legal NMW minimum (nmwHourly × weeklyHours × 52 / 12 ≈ £2,148). Surfaces on the
+hired-labour (Wages) finance line via MoneyType.AI, guarded by the true-cost passthrough so the
+salary itself is never suppressed. Leave-risk benchmark repointed at the grade rate — plumbing
+for negotiations; no underpay-quit fires until an offered wage can fall below it.
 
 ### Wage = true cost of employment — IMPLEMENTED (7e6886d)
 
