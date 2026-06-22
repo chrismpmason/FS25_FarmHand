@@ -35,6 +35,10 @@ FarmHandManager.TIER_NAMES = { "Novice", "Experienced", "Master" }
 FarmHandManager.TIER_EXP_EXPERIENCED = 50  -- Novice -> Experienced
 FarmHandManager.TIER_EXP_MASTER = 400      -- Experienced -> Master
 
+-- AI work-speed multiplier per tier (Novice slower, Master full). Applied to the
+-- working passes only (see FarmHandSpeed). Tunable.
+FarmHandManager.TIER_SPEED_FACTOR = { 0.6, 0.8, 1.0 }
+
 -- Certificates that gate the skilled grades (3-4). A small list so adding certs
 -- later is trivial. FarmHandCertificate is defined in the worker module (loaded
 -- before this one).
@@ -603,6 +607,12 @@ function FarmHandManager:getTierProgress(worker)
         return 1
     end
     return math.max(0, math.min(1, (exp - lo) / (hi - lo)))
+end
+
+--- The hand's AI work-speed multiplier from their tier (Novice slower, Master
+--- full). Drives the getSpeedLimit scaling on working passes.
+function FarmHandManager:getTierSpeedFactor(worker)
+    return FarmHandManager.TIER_SPEED_FACTOR[self:getTier(worker)] or 1.0
 end
 
 --- A single hand's monthly wage: the grade rate, floored at the legal NMW

@@ -28,6 +28,7 @@ local sourceFiles = {
     "scripts/FarmHandGate.lua",
     "scripts/FarmHandWorkDetector.lua",
     "scripts/FarmHandWear.lua",
+    "scripts/FarmHandSpeed.lua",
     "scripts/gui/FarmHandsDialog.lua",
 }
 
@@ -105,13 +106,19 @@ function FarmHand.onAIJobStart(self, farmId, ...)
         self.farmHandCounted = true
         manager.farmHandJobCount = (manager.farmHandJobCount or 0) + 1
 
+        local rootVehicle = FarmHand.getJobRootVehicle(self)
+
         -- ADS path: scale this hand's vehicles' wear with a per-instance override
         -- (removed at job end). Instance-field shadowing is independent of the
         -- load/finalize order that defeats a class-level wrap.
         if FarmHandWear.adsPresent then
             self._farmHandAdsVehicles =
-                FarmHandWear.applyADSOverride(FarmHand.getJobRootVehicle(self), hand, manager.settings)
+                FarmHandWear.applyADSOverride(rootVehicle, hand, manager.settings)
         end
+
+        -- Proficiency -> speed: lower-tier hands work the field slower (scales the
+        -- root's getSpeedLimit on working passes only; removed at job end).
+        self._farmHandSpeedVehicles = FarmHandSpeed.applyOverride(rootVehicle, hand, manager)
     end
 end
 
@@ -133,6 +140,12 @@ function FarmHand.onAIJobEnd(self, ...)
     if self._farmHandAdsVehicles ~= nil then
         FarmHandWear.removeADSOverride(self._farmHandAdsVehicles)
         self._farmHandAdsVehicles = nil
+    end
+
+    -- Restore the getSpeedLimit overrides installed for this job's vehicles.
+    if self._farmHandSpeedVehicles ~= nil then
+        FarmHandSpeed.removeOverride(self._farmHandSpeedVehicles)
+        self._farmHandSpeedVehicles = nil
     end
 end
 
