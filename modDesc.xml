@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <modDesc descVersion="105">
     <author>Chris Mason</author>
-    <version>0.1.0.0</version>
+    <version>0.2.0.0</version>
 
     <title>
         <en>FarmHand</en>
@@ -22,7 +22,7 @@ Decide who is worth keeping.]]></en>
 
     <iconFilename>icon_FarmHand.dds</iconFilename>
 
-    <multiplayer supported="true"/>
+    <multiplayer supported="false"/>
 
     <extraSourceFiles>
         <sourceFile filename="scripts/FarmHand.lua"/>
