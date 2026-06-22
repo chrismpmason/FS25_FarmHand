@@ -160,16 +160,18 @@ function FarmHandWear.applyADSOverride(rootVehicle, hand, settings)
     return wrapped
 end
 
---- Remove the per-instance overrides installed by applyADSOverride. Clearing the
---- instance field lets the vehicle's type function show through the metatable
---- again, so ADS runs unscaled once the hand's job ends.
+--- Remove the per-instance overrides installed by applyADSOverride. Restore the
+--- CAPTURED ORIGINAL function — NOT nil. ADS's method lives on the instance with
+--- no metatable fallback here, so nil-ing it leaves it genuinely missing and ADS
+--- errors every frame ("attempt to call missing method"). Handing back the saved
+--- original makes ADS's calls resolve cleanly again.
 function FarmHandWear.removeADSOverride(wrapped)
     if wrapped == nil then
         return
     end
     for _, cv in ipairs(wrapped) do
         if cv._farmHandOrigUSCAS ~= nil then
-            cv.updateSystemConditionAndStress = nil
+            cv.updateSystemConditionAndStress = cv._farmHandOrigUSCAS
             cv._farmHandOrigUSCAS = nil
         end
     end
