@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8" standalone="no" ?>
+<GUI name="FarmHandShellScreen" onOpen="onOpen" onClose="onClose">
+    <!-- Native full-screen dimmed background so the shell reads as an in-game menu. -->
+    <Bitmap profile="fs25_fullScreenBackground" id="background"/>
+
+    <Text profile="farmHandShell_title" text="$l10n_farmhand_ui_title"/>
+
+    <!-- Left-hand nav: four tab buttons, absolutely positioned (no BoxLayout flow,
+         to avoid layout-flow surprises). Native button chrome via buttonBack. -->
+    <!-- Tab icons are PARKED: the external ui_*.dds won't render in this
+         ScreenElement context (element/size/overlay correct, no load error). Tabs
+         are text-only for now. To re-enable: uncomment the icon Bitmap in each tab
+         below AND the icon-binding block in FarmHandShellScreen.lua, and restore the
+         label's icon offset (farmHandShell_tabLabel position ~64px). -->
+    <Button profile="farmHandShell_tab" id="tabRoster" onClick="onClickTabRoster" position="60px -120px">
+        <Bitmap profile="farmHandShell_tabHighlight" id="tabHlRoster"/>
+        <!-- <Bitmap profile="farmHandShell_tabIcon" id="iconRoster" imageFilename="gui/icons/ui_roster.dds"/> -->
+        <Text profile="farmHandShell_tabLabel" text="Roster"/>
+    </Button>
+    <Button profile="farmHandShell_tab" id="tabHire" onClick="onClickTabHire" position="60px -194px">
+        <Bitmap profile="farmHandShell_tabHighlight" id="tabHlHire"/>
+        <!-- <Bitmap profile="farmHandShell_tabIcon" id="iconHire" imageFilename="gui/icons/ui_hire.dds"/> -->
+        <Text profile="farmHandShell_tabLabel" text="Hire"/>
+    </Button>
+    <Button profile="farmHandShell_tab" id="tabCollege" onClick="onClickTabCollege" position="60px -268px">
+        <Bitmap profile="farmHandShell_tabHighlight" id="tabHlCollege"/>
+        <!-- <Bitmap profile="farmHandShell_tabIcon" id="iconCollege" imageFilename="gui/icons/ui_college.dds"/> -->
+        <Text profile="farmHandShell_tabLabel" text="College"/>
+    </Button>
+    <Button profile="farmHandShell_tab" id="tabOverview" onClick="onClickTabOverview" position="60px -342px">
+        <Bitmap profile="farmHandShell_tabHighlight" id="tabHlOverview"/>
+        <!-- <Bitmap profile="farmHandShell_tabIcon" id="iconOverview" imageFilename="gui/icons/ui_overview.dds"/> -->
+        <Text profile="farmHandShell_tabLabel" text="Overview"/>
+    </Button>
+
+    <!-- Right content area: four placeholder panes stacked at the same spot; only
+         the active one is visible (toggled in selectTab). -->
+    <GuiElement profile="farmHandShell_content" id="content">
+        <Text profile="farmHandShell_placeholder" id="paneRoster"   text="Roster (placeholder)"/>
+        <Text profile="farmHandShell_placeholder" id="paneHire"     text="Hire (placeholder)"/>
+        <Text profile="farmHandShell_placeholder" id="paneCollege"  text="College (placeholder)"/>
+        <Text profile="farmHandShell_placeholder" id="paneOverview" text="Overview (placeholder)"/>
+    </GuiElement>
+
+    <!-- Native footer back button (also catches ESC for a clean close). -->
+    <BoxLayout profile="fs25_buttonBox" id="buttonBox">
+        <Button profile="buttonBack" id="buttonBack" onClick="onClickBack" text="$l10n_button_back"/>
+    </BoxLayout>
+
+    <GUIProfiles>
+        <Profile name="farmHandShell_title" extends="fs25_textDefault" with="anchorTopLeft pivotTopLeft">
+            <position value="60px -40px"/>
+            <textSize value="34px"/>
+            <textBold value="true"/>
+        </Profile>
+
+        <!-- Tab: a NEUTRAL clickable box (emptyPanel), NOT buttonBack — buttonBack
+             bakes the MENU_BACK (ESC) input glyph into the left slot, which hid the
+             icon. No chrome of its own; bg/icon/label are children. -->
+        <Profile name="farmHandShell_tab" extends="emptyPanel" with="anchorTopLeft pivotTopLeft">
+            <size value="340px 60px"/>
+        </Profile>
+
+        <!-- Active-tab highlight fill. Uses a real UI-atlas slice (NOT a sourceless
+             baseReference, which renders missing-texture magenta) tinted with the
+             native menu highlight preset. Hidden by default; selectTab shows it only
+             on the active tab, so inactive tabs have no quad over their icon/label. -->
+        <Profile name="farmHandShell_tabHighlight" extends="baseReference" with="anchorTopLeft pivotTopLeft">
+            <size value="340px 60px"/>
+            <position value="0px 0px"/>
+            <imageSliceId value="gui.3dShop_button_middle"/>
+            <imageColor value="$preset_fs25_colorMainHighlight"/>
+            <visible value="false"/>
+        </Profile>
+
+        <!-- Tab icon overlay: left of the label, vertically centred. The white-on-
+             transparent .dds is bound in Lua (setImageFilename, absolute mod path);
+             imageColor makes the white art render (baseReference has no visible default). -->
+        <Profile name="farmHandShell_tabIcon" extends="baseReference" with="anchorMiddleLeft pivotMiddleLeft">
+            <size value="40px 40px"/>
+            <position value="12px 0px"/>
+            <imageColor value="1 1 1 1"/>
+        </Profile>
+
+        <!-- Tab label. Normal left padding (no icon offset while icons are parked;
+             restore ~64px if the icon overlay is re-enabled). -->
+        <Profile name="farmHandShell_tabLabel" extends="fs25_textDefault" with="anchorMiddleLeft pivotMiddleLeft">
+            <position value="20px 0px"/>
+            <textSize value="22px"/>
+        </Profile>
+
+        <!-- Content viewport to the right of the nav column. -->
+        <Profile name="farmHandShell_content" extends="emptyPanel" with="anchorTopLeft pivotTopLeft">
+            <position value="460px -120px"/>
+            <size value="1340px 760px"/>
+        </Profile>
+
+        <!-- Placeholder label: top-left of the content viewport. All four overlap;
+             selectTab shows exactly one. -->
+        <Profile name="farmHandShell_placeholder" extends="fs25_textDefault" with="anchorTopLeft pivotTopLeft">
+            <position value="0px 0px"/>
+            <textSize value="30px"/>
+        </Profile>
+    </GUIProfiles>
+</GUI>
