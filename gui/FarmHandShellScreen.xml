@@ -33,10 +33,46 @@
         <Text profile="farmHandShell_tabLabel" text="Overview"/>
     </Button>
 
-    <!-- Right content area: four placeholder panes stacked at the same spot; only
-         the active one is visible (toggled in selectTab). -->
+    <!-- Right content area: panes stacked at the same spot; only the active one is
+         visible (toggled in selectTab). Roster is a real list; the rest are still
+         placeholders (ported in later sub-slices). -->
     <GuiElement profile="farmHandShell_content" id="content">
-        <Text profile="farmHandShell_placeholder" id="paneRoster"   text="Roster (placeholder)"/>
+
+        <!-- ROSTER pane: live hand list + dismiss. Mirrors the K dialog's SmoothList. -->
+        <GuiElement profile="farmHandShell_pane" id="paneRoster">
+            <Text profile="shell_colHeader" text="Name"       position="20px 0px"/>
+            <Text profile="shell_colHeader" text="Tier"       position="380px 0px"/>
+            <Text profile="shell_colHeader" text="Grade"      position="680px 0px"/>
+            <Text profile="shell_colHeader" text="Wage"       position="920px 0px"/>
+            <Text profile="shell_colHeader" text="Experience" position="1080px 0px"/>
+
+            <GuiElement profile="shell_listContainer" id="rosterListContainer">
+                <SmoothList profile="shell_handList" id="rosterList" startClipperElementName="rosterStart" endClipperElementName="rosterStop">
+                    <ListItem profile="shell_listItem" onClick="onClickHand">
+                        <Bitmap profile="shell_listItemBg" name="bg"/>
+                        <Text profile="shell_cellName"   name="name"/>
+                        <Text profile="shell_cellTier"   name="tier"/>
+                        <Text profile="shell_cellGrade"  name="grade"/>
+                        <Text profile="shell_cellWage"   name="wage"/>
+                        <Text profile="shell_cellExp"    name="exp"/>
+                        <Text profile="shell_cellActive" name="active"/>
+                    </ListItem>
+                </SmoothList>
+                <Bitmap profile="fs25_secondaryMenuStartClipper" name="rosterStart"/>
+                <Bitmap profile="fs25_secondaryMenuStopClipper" name="rosterStop" position="0px -700px"/>
+                <ThreePartBitmap profile="fs25_subCategoryListSliderBox" position="20px 0px">
+                    <Slider profile="fs25_animalTargetListSlider" id="rosterSlider" dataElementId="rosterList"/>
+                </ThreePartBitmap>
+            </GuiElement>
+
+            <!-- Dismiss: neutral clickable box (no buttonBack input glyph); handler
+                 confirms via YesNoDialog then removeWorker. -->
+            <Button profile="farmHandShell_paneButton" id="rosterDismiss" onClick="onClickDismiss" position="20px -700px">
+                <Bitmap profile="farmHandShell_paneButtonBg"/>
+                <Text profile="farmHandShell_paneButtonLabel" text="Dismiss"/>
+            </Button>
+        </GuiElement>
+
         <Text profile="farmHandShell_placeholder" id="paneHire"     text="Hire (placeholder)"/>
         <Text profile="farmHandShell_placeholder" id="paneCollege"  text="College (placeholder)"/>
         <Text profile="farmHandShell_placeholder" id="paneOverview" text="Overview (placeholder)"/>
@@ -100,6 +136,86 @@
         <Profile name="farmHandShell_placeholder" extends="fs25_textDefault" with="anchorTopLeft pivotTopLeft">
             <position value="0px 0px"/>
             <textSize value="30px"/>
+        </Profile>
+
+        <!-- ===== Roster pane ===== -->
+
+        <!-- Pane container: fills the content viewport. -->
+        <Profile name="farmHandShell_pane" extends="emptyPanel" with="anchorTopLeft pivotTopLeft">
+            <position value="0px 0px"/>
+            <size value="1340px 760px"/>
+        </Profile>
+
+        <Profile name="shell_colHeader" extends="fs25_textDefault" with="anchorTopLeft pivotTopLeft">
+            <textSize value="18px"/>
+            <textBold value="true"/>
+            <textColor value="0.7 0.7 0.7 1"/>
+        </Profile>
+
+        <!-- List viewport, below the headers. -->
+        <Profile name="shell_listContainer" extends="emptyPanel" with="anchorTopLeft pivotTopLeft">
+            <position value="0px -44px"/>
+            <size value="1300px 650px"/>
+        </Profile>
+
+        <!-- Scrollable list: height governs visible rows (~10 x 64px). Mirrors the
+             K dialog's pattern (<height> + anchorTopStretchingX, not <size>). -->
+        <Profile name="shell_handList" extends="fs25_animalTargetList" with="anchorTopStretchingX pivotTopLeft">
+            <height value="640px"/>
+        </Profile>
+
+        <Profile name="shell_listItem" extends="emptyPanel" with="anchorTopStretchingX pivotTopLeft">
+            <height value="64px"/>
+        </Profile>
+
+        <Profile name="shell_listItemBg" extends="baseReference" with="anchorStretchingYStretchingX">
+            <imageSliceId value="gui.3dShop_button_middle"/>
+            <imageColor value="$preset_fs25_colorGreyListItem"/>
+            <imageSelectedColor value="$preset_fs25_colorMainHighlight"/>
+        </Profile>
+
+        <Profile name="shell_cellName" extends="fs25_textDefault" with="anchorMiddleLeft">
+            <width value="340px"/>
+            <position value="20px 0px"/>
+            <textSize value="24px"/>
+        </Profile>
+        <Profile name="shell_cellTier" extends="fs25_textDefault" with="anchorMiddleLeft">
+            <width value="280px"/>
+            <position value="380px 0px"/>
+            <textSize value="20px"/>
+        </Profile>
+        <Profile name="shell_cellGrade" extends="fs25_textDefault" with="anchorMiddleLeft">
+            <width value="220px"/>
+            <position value="680px 0px"/>
+            <textSize value="20px"/>
+        </Profile>
+        <Profile name="shell_cellWage" extends="fs25_textDefault" with="anchorMiddleLeft">
+            <width value="160px"/>
+            <position value="920px 0px"/>
+            <textSize value="20px"/>
+        </Profile>
+        <Profile name="shell_cellExp" extends="fs25_textDefault" with="anchorMiddleLeft">
+            <width value="200px"/>
+            <position value="1080px 0px"/>
+            <textSize value="20px"/>
+        </Profile>
+        <Profile name="shell_cellActive" extends="fs25_textDefault" with="anchorMiddleRight">
+            <width value="140px"/>
+            <position value="-30px 0px"/>
+            <textAlignment value="right"/>
+        </Profile>
+
+        <!-- Dismiss button: neutral clickable box + grey fill + centred label. -->
+        <Profile name="farmHandShell_paneButton" extends="emptyPanel" with="anchorTopLeft pivotTopLeft">
+            <size value="200px 56px"/>
+        </Profile>
+        <Profile name="farmHandShell_paneButtonBg" extends="baseReference" with="anchorStretchingYStretchingX">
+            <imageSliceId value="gui.3dShop_button_middle"/>
+            <imageColor value="0.18 0.18 0.18 0.9"/>
+        </Profile>
+        <Profile name="farmHandShell_paneButtonLabel" extends="fs25_textDefault" with="anchorMiddleCenter pivotMiddleCenter">
+            <textSize value="22px"/>
+            <textAlignment value="center"/>
         </Profile>
     </GUIProfiles>
 </GUI>
