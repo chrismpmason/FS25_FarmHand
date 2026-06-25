@@ -47,8 +47,9 @@ function FarmHandShellScreen.new(target, customMt)
     -- Default to the Roster tab.
     self.activeTab = 1
 
-    -- Roster snapshot for the list (rebuilt on open / Roster select / change).
+    -- Snapshots for the lists (rebuilt on open / tab select / change).
     self.rosterHands = {}
+    self.candidates = {}
 
     return self
 end
@@ -60,10 +61,14 @@ function FarmHandShellScreen:onGuiSetupFinished()
     self.tabHls = { self.tabHlRoster, self.tabHlHire, self.tabHlCollege, self.tabHlOverview }
     self.panes = { self.paneRoster, self.paneHire, self.paneCollege, self.paneOverview }
 
-    -- Roster list focus (mirrors the K dialog's handList linking).
+    -- List focus (mirrors the K dialog's handList linking).
     if self.rosterList ~= nil then
         FocusManager:linkElements(self.rosterList, FocusManager.TOP, nil)
         FocusManager:linkElements(self.rosterList, FocusManager.BOTTOM, nil)
+    end
+    if self.hireList ~= nil then
+        FocusManager:linkElements(self.hireList, FocusManager.TOP, nil)
+        FocusManager:linkElements(self.hireList, FocusManager.BOTTOM, nil)
     end
 
     -- Tab icons are PARKED (text-only tabs for now). The external ui_*.dds load
@@ -120,9 +125,11 @@ function FarmHandShellScreen:selectTab(index)
         end
     end
 
-    -- Refresh the Roster list whenever its tab is shown.
+    -- Refresh a tab's list whenever it is shown.
     if index == 1 then
         self:refreshRoster()
+    elseif index == 2 then
+        self:refreshHire()
     end
 end
 
@@ -174,6 +181,10 @@ function FarmHandShellScreen:getNumberOfSections(list)
 end
 
 function FarmHandShellScreen:getNumberOfItemsInSection(list, section)
+    if list == self.hireList then
+        -- At least one row so the empty-pool placeholder can render.
+        return math.max(1, self.candidates ~= nil and #self.candidates or 0)
+    end
     return self.rosterHands ~= nil and #self.rosterHands or 0
 end
 
@@ -182,6 +193,15 @@ function FarmHandShellScreen:getTitleForSectionHeader(list, section)
 end
 
 function FarmHandShellScreen:populateCellForItemInSection(list, section, index, cell)
+    if list == self.hireList then
+        self:populateCandidateCell(index, cell)
+    else
+        self:populateHandCell(index, cell)
+    end
+end
+
+--- Roster row: name, tier + progress, grade, wage, experience, active marker.
+function FarmHandShellScreen:populateHandCell(index, cell)
     local hand = self.rosterHands ~= nil and self.rosterHands[index] or nil
     if hand == nil then
         return
@@ -222,6 +242,53 @@ function FarmHandShellScreen:populateCellForItemInSection(list, section, index, 
     for _, n in ipairs({ "name", "tier", "grade", "wage", "exp" }) do
         local e = cell:getAttribute(n)
         if e ~= nil then e:setTextColor(shade, shade, shade, 1) end
+    end
+end
+
+--- Hire row: a candidate's name + tier/grade/wage/experience (what you're buying),
+--- or the empty-pool placeholder. Mirrors the K dialog's candidate cell.
+function FarmHandShellScreen:populateCandidateCell(index, cell)
+    local nameEl = cell:getAttribute("name")
+    local tierEl = cell:getAttribute("tier")
+    local gradeEl = cell:getAttribute("grade")
+    local wageEl = cell:getAttribute("wage")
+    local expEl = cell:getAttribute("exp")
+
+    local candidate = self.candidates ~= nil and self.candidates[index] or nil
+    if candidate == nil then
+        -- Empty-pool placeholder: disabled (greyed, non-selectable, click ignored).
+        cell:setDisabled(true)
+        if nameEl ~= nil then
+            nameEl:setText(g_i18n:getText("farmhand_ui_no_candidates"))
+            nameEl:setTextColor(0.5, 0.5, 0.5, 1)
+        end
+        for _, e in ipairs({ tierEl, gradeEl, wageEl, expEl }) do
+            if e ~= nil then e:setText("") end
+        end
+        return
+    end
+
+    cell:setDisabled(false)
+    local mgr = FarmHand.manager
+
+    if nameEl ~= nil then
+        nameEl:setText(candidate.name)
+        nameEl:setTextColor(1, 1, 1, 1)
+    end
+    if tierEl ~= nil and mgr ~= nil then
+        if mgr:getTier(candidate) >= 3 then
+            tierEl:setText(mgr:getTierName(candidate))
+        else
+            tierEl:setText(string.format("%s %d%%", mgr:getTierName(candidate),
+                math.floor(mgr:getTierProgress(candidate) * 100 + 0.5)))
+        end
+    end
+    if gradeEl ~= nil and mgr ~= nil then gradeEl:setText(mgr:getGradeName(candidate)) end
+    if wageEl ~= nil and mgr ~= nil then wageEl:setText(string.format("£%d", mgr:getWorkerMonthlyWage(candidate))) end
+    if expEl ~= nil then expEl:setText(string.format("%.1f ha", candidate.hectaresWorked or 0)) end
+
+    for _, e in ipairs({ tierEl, gradeEl, wageEl, expEl }) do
+        if e ~= nil then e:setTextColor(0.85, 0.85, 0.85, 1) end
     end
 end
 
@@ -278,6 +345,44 @@ function FarmHandShellScreen:onDismissConfirmed(yes)
     if manager ~= nil then
         manager:removeWorker(handId)
     end
+    self:refreshRoster()
+end
+
+-- ---- Hire pane (candidate pool) -------------------------------------------
+
+--- Rebuild the candidate snapshot from the live pool and reload the Hire list.
+function FarmHandShellScreen:refreshHire()
+    local manager = FarmHand.manager
+    self.candidates = manager ~= nil and manager.candidates or {}
+
+    if self.hireList == nil then
+        return
+    end
+    self.hireList:reloadData()
+    if #self.candidates > 0 then
+        self.hireList:setSelectedItem(1, 1)
+    end
+end
+
+--- Click a candidate row -> hire them (the manager carries their seeded XP/cert
+--- into the roster). Refresh the now-smaller pool and the roster. No-op on the
+--- empty-pool placeholder.
+function FarmHandShellScreen:onClickCandidate(item)
+    local index = item.indexInSection or (self.hireList ~= nil and self.hireList.selectedIndex)
+    if index == nil then
+        return
+    end
+    local candidate = self.candidates ~= nil and self.candidates[index] or nil
+    if candidate == nil then
+        return -- placeholder row
+    end
+
+    local manager = FarmHand.manager
+    if manager ~= nil then
+        manager:hireCandidate(candidate.id)
+    end
+
+    self:refreshHire()
     self:refreshRoster()
 end
 

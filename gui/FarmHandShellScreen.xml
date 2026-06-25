@@ -73,7 +73,36 @@
             </Button>
         </GuiElement>
 
-        <Text profile="farmHandShell_placeholder" id="paneHire"     text="Hire (placeholder)"/>
+        <!-- HIRE pane: candidate pool; click a row to hire. Reuses the Roster list
+             profiles; data source branches on the list in Lua. -->
+        <GuiElement profile="farmHandShell_pane" id="paneHire">
+            <Text profile="shell_colHeader" text="Name"       position="20px 0px"/>
+            <Text profile="shell_colHeader" text="Tier"       position="380px 0px"/>
+            <Text profile="shell_colHeader" text="Grade"      position="680px 0px"/>
+            <Text profile="shell_colHeader" text="Wage"       position="920px 0px"/>
+            <Text profile="shell_colHeader" text="Experience" position="1080px 0px"/>
+
+            <GuiElement profile="shell_listContainer" id="hireListContainer">
+                <SmoothList profile="shell_handList" id="hireList" startClipperElementName="hireStart" endClipperElementName="hireStop">
+                    <ListItem profile="shell_listItem" onClick="onClickCandidate">
+                        <Bitmap profile="shell_listItemBg" name="bg"/>
+                        <Text profile="shell_cellName"  name="name"/>
+                        <Text profile="shell_cellTier"  name="tier"/>
+                        <Text profile="shell_cellGrade" name="grade"/>
+                        <Text profile="shell_cellWage"  name="wage"/>
+                        <Text profile="shell_cellExp"   name="exp"/>
+                    </ListItem>
+                </SmoothList>
+                <Bitmap profile="fs25_secondaryMenuStartClipper" name="hireStart"/>
+                <Bitmap profile="fs25_secondaryMenuStopClipper" name="hireStop" position="0px -700px"/>
+                <ThreePartBitmap profile="fs25_subCategoryListSliderBox" position="20px 0px">
+                    <Slider profile="fs25_animalTargetListSlider" id="hireSlider" dataElementId="hireList"/>
+                </ThreePartBitmap>
+            </GuiElement>
+
+            <Text profile="shell_hint" text="Click a candidate to hire them." position="20px -700px"/>
+        </GuiElement>
+
         <Text profile="farmHandShell_placeholder" id="paneCollege"  text="College (placeholder)"/>
         <Text profile="farmHandShell_placeholder" id="paneOverview" text="Overview (placeholder)"/>
     </GuiElement>
@@ -149,6 +178,11 @@
         <Profile name="shell_colHeader" extends="fs25_textDefault" with="anchorTopLeft pivotTopLeft">
             <textSize value="18px"/>
             <textBold value="true"/>
+            <textColor value="0.7 0.7 0.7 1"/>
+        </Profile>
+
+        <Profile name="shell_hint" extends="fs25_textDefault" with="anchorTopLeft pivotTopLeft">
+            <textSize value="20px"/>
             <textColor value="0.7 0.7 0.7 1"/>
         </Profile>
 
