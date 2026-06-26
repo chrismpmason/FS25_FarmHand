@@ -15,7 +15,7 @@
     <Button profile="farmHandShell_tab" id="tabRoster" onClick="onClickTabRoster" position="60px -120px">
         <Bitmap profile="farmHandShell_tabHighlight" id="tabHlRoster"/>
         <Bitmap profile="farmHandShell_tabIcon" id="iconRoster"/>
-        <Text profile="farmHandShell_tabLabel" text="Roster"/>
+        <Text profile="farmHandShell_tabLabel" text="Employees"/>
     </Button>
     <Button profile="farmHandShell_tab" id="tabHire" onClick="onClickTabHire" position="60px -240px">
         <Bitmap profile="farmHandShell_tabHighlight" id="tabHlHire"/>
