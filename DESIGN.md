@@ -320,8 +320,8 @@ Tabs:
   (today's Hands view).
 - **Hire** — the candidate pool (tiered random hiring), with room to show each candidate's
   tier/grade/wage properly instead of cramped rows.
-- **College** — enrol hands on courses, tuition, who's training and time remaining (the build-2
-  College feature lives here; the shell is what gives College its UI real estate).
+- **College** — enrol hands on courses, tuition, who's training and time remaining. The build-2
+  College feature lives here; full design in §11 (the shell is what gives College its UI real estate).
 - **Overview / Stats** — company dashboard: total monthly payroll, headcount, active vs idle vs
   currently-working, certified count, courses in progress. The ETS2 "company manager" feel —
   turns the panel from "manage one hand" into "run a workforce".
@@ -340,7 +340,78 @@ Do not start until tiered random hiring is committed and the current test build'
 
 ---
 
-## 11. Status
+## 11. College / training — IN DESIGN (learn-on-the-job model)
+
+Turns the existing course scaffolding (enrol, monthly advance, completion cert-grant, persistence
+— **all already built**) into a player-facing progression feature: a course catalogue, tuition,
+operation-specific boosts, and the College tab UI. The shell (§10) is what gives it the screen
+real estate.
+
+**Study model — LEARN-ON-THE-JOB (decided).** A hand enrolled on a course keeps working; the
+course advances each month the hand actually worked (`workedThisMonth` — the existing
+`advanceCourses` rule). The cost of training is **tuition (money) + time (N months)** — never lost
+labour. (Released-to-study — the hand benched while training — is a possible v2 depth upgrade,
+deliberately not v1: it would mean undoing the working logic and reintroducing a lockout.)
+
+**Course catalogue (5).** All tuition/duration values are tunable constants.
+
+- **Spray** *(GATE — already built)* — grants the PESTICIDES cert; required to apply herbicide.
+  Tuition £800, 3 months.
+- **Combine** *(BOOST)* — grants COMBINE cert; faster + gentler when harvesting. £600, 3 months.
+- **Seeder** *(BOOST)* — SEEDER cert; faster + gentler when seed drilling. £600, 3 months.
+- **Slurry & Fertiliser** *(BOOST)* — FERTILISER cert; faster + gentler when fertilising/slurry.
+  £600, 3 months.
+- **Forage** *(BOOST)* — FORAGE cert; faster + gentler when mowing/tedding/baling. £600, 3 months.
+
+**Gate vs boost (the hybrid).**
+
+- **GATE** — can't do the operation at all without the cert (spray/herbicide — legal; already
+  implemented via `FarmHandGate`).
+- **BOOST** — can do it untrained, but the cert makes the hand faster + gentler on kit for *that*
+  operation (and contributes to pay grade). Never locks the player out of farming.
+
+**Operation detection** *(feasible — per the College audit).* Reuse `FarmHandGate`'s
+spec-inspection: walk the implement combination and identify the operation by specialisation —
+`spec_combine`/cutter = harvest, `spec_sowingMachine`/planter = seed,
+`spec_mower`/`spec_tedder`/`spec_windrower`/`spec_baler` = forage, `spec_sprayer` + fill type =
+spray vs fertiliser/slurry. The spray↔fertiliser split is fill-type-driven (already handled in the
+gate).
+
+**Boost application.** At `FarmHand.onAIJobStart` — where the speed + ADS-wear overrides already
+install — detect the operation, check whether the active hand holds the matching course cert, and
+if so apply a boost factor (~+15% speed, ~−15% wear, tunable) *on top of* the tier factor. Removed
+at job end like the existing overrides. Boost surface = **speed + wear only** (quality/waste levers
+aren't hooked in the engine — out of scope).
+
+**Tuition.** A one-off fee deducted on enrolment via the proven `addMoney` path (same as
+`payWages`, with the passthrough flag). Block enrolment if farm funds are insufficient (confirm the
+farm-balance accessor in-game at build time — a one-liner).
+
+**Completion.** `advanceCourses` already grants the cert on completion; **add** a small XP bonus
+(~+25 ha to `hectaresWorked`, tunable) in the completion branch.
+
+**New cert types needed.** COMBINE, SEEDER, FERTILISER, FORAGE — currently only PESTICIDES exists.
+Extend the `FarmHandCertificate` definitions.
+
+**College tab UI** (the shell's College pane). List employees with course status — "Studying:
+{course} ({n}/{len} mo)" if enrolled, or an **Enrol** action if not. Enrol flow: pick a hand →
+pick a course (showing tuition) → confirm (with cost) → deduct tuition → enrol. Show the course
+catalogue + costs.
+
+**Dropped — Road/Towing course.** Road transport is AutoDrive/Courseplay, not hookable via
+FarmHand's field-work hooks (`AIJobFieldWork:validate` / `AIFieldWorker.updateAIFieldWorker`).
+
+**Build slices (proposed).**
+
+- **Slice A** *(vertical loop, low risk)* — College tab UI + tuition deduction + completion XP,
+  using the EXISTING fully-built pesticide course. Proves enrol → study → complete → cert
+  end-to-end with real UI + money.
+- **Slice B** *(the boost courses)* — add the 4 new cert types + operation detection + speed/wear
+  boosts.
+
+---
+
+## 12. Status
 
 **Built & committed**
 
@@ -365,7 +436,7 @@ Do not start until tiered random hiring is committed and the current test build'
 
 ---
 
-## 12. Suggested build order
+## 13. Suggested build order
 
 1. **Specialisation model + AI-job speed effect** — generalises the gate and the experience
    idea in one slice.
@@ -380,7 +451,7 @@ Do not start until tiered random hiring is committed and the current test build'
 
 ---
 
-## 13. Implementation notes & risks
+## 14. Implementation notes & risks
 
 - **Courseplay integration is a large dependency** with its own API. The basegame AI worker
   is the tractable target and is what the certificate gate already hooks. Build everything on
@@ -395,7 +466,7 @@ Do not start until tiered random hiring is committed and the current test build'
 
 ---
 
-## 14. Conventions
+## 15. Conventions
 
 - Keep the two axes distinct: **certificates/tickets = legal gates; specialisations =
   proficiency.** Never merge them.
