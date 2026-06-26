@@ -100,6 +100,7 @@ end
 function FarmHandShellScreen:onOpen()
     FarmHandShellScreen:superClass().onOpen(self)
     self:selectTab(self.activeTab or 1)
+    self:refreshOverview() -- compute the dashboard on open (also refreshed on its select)
 end
 
 --- Show one tab's placeholder pane, hide the others, and highlight the active tab
@@ -124,11 +125,13 @@ function FarmHandShellScreen:selectTab(index)
         end
     end
 
-    -- Refresh a tab's list whenever it is shown.
+    -- Refresh a tab's content whenever it is shown.
     if index == 1 then
         self:refreshRoster()
     elseif index == 2 then
         self:refreshHire()
+    elseif index == 4 then
+        self:refreshOverview()
     end
 end
 
@@ -406,6 +409,49 @@ function FarmHandShellScreen:onHireConfirmed(yes)
     end
 
     self:refreshHire()
+end
+
+-- ---- Overview pane (summary dashboard) ------------------------------------
+
+--- Compute the dashboard stats from existing manager/worker state and write them
+--- into the label/value rows. Pure read; no new tracking, no manager changes.
+--- Handles an empty roster cleanly (0 hands -> zeros / "None selected").
+function FarmHandShellScreen:refreshOverview()
+    local mgr = FarmHand.manager
+    local hands = mgr ~= nil and mgr:getWorkersList() or {}
+    local headcount = #hands
+
+    local payroll, qualified, totalExp = 0, 0, 0
+    local tiers = { 0, 0, 0 }
+    for _, w in ipairs(hands) do
+        payroll = payroll + mgr:getWorkerMonthlyWage(w)
+        if mgr:hasSkilledCert(w) then qualified = qualified + 1 end
+        totalExp = totalExp + (w.hectaresWorked or 0)
+        local t = mgr:getTier(w)
+        tiers[t] = (tiers[t] or 0) + 1
+    end
+
+    local active = mgr ~= nil and mgr:getActiveHand() or nil
+    local isWorking = active ~= nil and (mgr.farmHandJobCount or 0) > 0
+    local workingCount = isWorking and 1 or 0
+    local idleCount = headcount - workingCount
+    local candidates = mgr ~= nil and #mgr.candidates or 0
+
+    local function set(el, text)
+        if el ~= nil then el:setText(text) end
+    end
+
+    set(self.ovHands, tostring(headcount))
+    set(self.ovPayroll, string.format("£%d", payroll))
+    set(self.ovWorking, string.format("%d working · %d idle", workingCount, idleCount))
+    set(self.ovQualified, string.format("%d of %d", qualified, headcount))
+    set(self.ovTierMix, string.format("%d Novice · %d Experienced · %d Master",
+        tiers[1] or 0, tiers[2] or 0, tiers[3] or 0))
+    set(self.ovTotalExp, string.format("%.1f ha", totalExp))
+    set(self.ovActive, active ~= nil
+        and (active.name .. " — " .. (isWorking and "Working" or "Idle"))
+        or "None selected")
+    set(self.ovCandidates, tostring(candidates))
 end
 
 --- ESC / Back: close the shell and return to the game.
