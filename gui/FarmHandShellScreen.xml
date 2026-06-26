@@ -14,22 +14,22 @@
          label's icon offset (farmHandShell_tabLabel position ~64px). -->
     <Button profile="farmHandShell_tab" id="tabRoster" onClick="onClickTabRoster" position="60px -120px">
         <Bitmap profile="farmHandShell_tabHighlight" id="tabHlRoster"/>
-        <!-- <Bitmap profile="farmHandShell_tabIcon" id="iconRoster" imageFilename="gui/icons/ui_roster.dds"/> -->
+        <Bitmap profile="farmHandShell_tabIcon" id="iconRoster"/>
         <Text profile="farmHandShell_tabLabel" text="Roster"/>
     </Button>
     <Button profile="farmHandShell_tab" id="tabHire" onClick="onClickTabHire" position="60px -194px">
         <Bitmap profile="farmHandShell_tabHighlight" id="tabHlHire"/>
-        <!-- <Bitmap profile="farmHandShell_tabIcon" id="iconHire" imageFilename="gui/icons/ui_hire.dds"/> -->
+        <Bitmap profile="farmHandShell_tabIcon" id="iconHire"/>
         <Text profile="farmHandShell_tabLabel" text="Hire"/>
     </Button>
     <Button profile="farmHandShell_tab" id="tabCollege" onClick="onClickTabCollege" position="60px -268px">
         <Bitmap profile="farmHandShell_tabHighlight" id="tabHlCollege"/>
-        <!-- <Bitmap profile="farmHandShell_tabIcon" id="iconCollege" imageFilename="gui/icons/ui_college.dds"/> -->
+        <Bitmap profile="farmHandShell_tabIcon" id="iconCollege"/>
         <Text profile="farmHandShell_tabLabel" text="College"/>
     </Button>
     <Button profile="farmHandShell_tab" id="tabOverview" onClick="onClickTabOverview" position="60px -342px">
         <Bitmap profile="farmHandShell_tabHighlight" id="tabHlOverview"/>
-        <!-- <Bitmap profile="farmHandShell_tabIcon" id="iconOverview" imageFilename="gui/icons/ui_overview.dds"/> -->
+        <Bitmap profile="farmHandShell_tabIcon" id="iconOverview"/>
         <Text profile="farmHandShell_tabLabel" text="Overview"/>
     </Button>
 
@@ -145,12 +145,17 @@
             <size value="40px 40px"/>
             <position value="12px 0px"/>
             <imageColor value="1 1 1 1"/>
+            <!-- Required to composite a transparent external .dds (setImageFilename):
+                 tells the Bitmap there is no atlas slice, so it samples the full
+                 image with alpha. The base-game transparent-icon elements (Farmland
+                 fill-type icon, RealisticLivestock animal icon) all set this; without
+                 it our element drew opaque images but blanked transparent ones. -->
+            <imageSliceId value="noSlice"/>
         </Profile>
 
-        <!-- Tab label. Normal left padding (no icon offset while icons are parked;
-             restore ~64px if the icon overlay is re-enabled). -->
+        <!-- Tab label. Offset right of the icon (icons re-enabled for the diagnostic). -->
         <Profile name="farmHandShell_tabLabel" extends="fs25_textDefault" with="anchorMiddleLeft pivotMiddleLeft">
-            <position value="20px 0px"/>
+            <position value="64px 0px"/>
             <textSize value="22px"/>
         </Profile>
 

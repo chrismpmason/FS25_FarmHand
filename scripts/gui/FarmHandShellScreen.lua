@@ -71,23 +71,22 @@ function FarmHandShellScreen:onGuiSetupFinished()
         FocusManager:linkElements(self.hireList, FocusManager.BOTTOM, nil)
     end
 
-    -- Tab icons are PARKED (text-only tabs for now). The external ui_*.dds load
-    -- without error but won't render in this ScreenElement context. The assets and
-    -- this binding are kept; to re-enable, uncomment the icon <Bitmap> in each tab
-    -- in FarmHandShellScreen.xml and the block below (and restore the label offset).
-    -- local iconDir = modDirectory .. "gui/icons/"
-    -- local icons = {
-    --     { self.iconRoster, "ui_roster.dds" },
-    --     { self.iconHire, "ui_hire.dds" },
-    --     { self.iconCollege, "ui_college.dds" },
-    --     { self.iconOverview, "ui_overview.dds" },
-    -- }
-    -- for _, entry in ipairs(icons) do
-    --     local element, file = entry[1], entry[2]
-    --     if element ~= nil and element.setImageFilename ~= nil then
-    --         element:setImageFilename(iconDir .. file)
-    --     end
-    -- end
+    -- Bind each tab icon to its matching line-art .dds (re-encoded with nvcompress;
+    -- the diagnostic confirmed the slot/loader is fine and only the old files were
+    -- bad). Absolute paths via setImageFilename.
+    local iconDir = modDirectory .. "gui/icons/"
+    local icons = {
+        { self.iconRoster,   "ui_roster.dds" },
+        { self.iconHire,     "ui_hire.dds" },
+        { self.iconCollege,  "ui_college.dds" },
+        { self.iconOverview, "ui_overview.dds" },
+    }
+    for _, entry in ipairs(icons) do
+        local element, file = entry[1], entry[2]
+        if element ~= nil and element.setImageFilename ~= nil then
+            element:setImageFilename(iconDir .. file)
+        end
+    end
 end
 
 --- Show the shell (loads it on first use).
@@ -365,8 +364,8 @@ function FarmHandShellScreen:refreshHire()
 end
 
 --- Click a candidate row -> hire them (the manager carries their seeded XP/cert
---- into the roster). Refresh the now-smaller pool and the roster. No-op on the
---- empty-pool placeholder.
+--- into the roster). Confirm first via YesNoDialog (id stashed on self, same
+--- pattern as the dismiss flow). No-op on the empty-pool placeholder.
 function FarmHandShellScreen:onClickCandidate(item)
     local index = item.indexInSection or (self.hireList ~= nil and self.hireList.selectedIndex)
     if index == nil then
@@ -377,13 +376,36 @@ function FarmHandShellScreen:onClickCandidate(item)
         return -- placeholder row
     end
 
-    local manager = FarmHand.manager
-    if manager ~= nil then
-        manager:hireCandidate(candidate.id)
+    self.pendingHireId = candidate.id
+
+    local mgr = FarmHand.manager
+    local tierName = mgr ~= nil and mgr:getTierName(candidate) or "?"
+    local gradeName = mgr ~= nil and mgr:getGradeName(candidate) or "?"
+    local wage = mgr ~= nil and mgr:getWorkerMonthlyWage(candidate) or 0
+
+    YesNoDialog.show(
+        self.onHireConfirmed,
+        self,
+        string.format("Hire %s (%s · %s)? They'll draw £%d/month.",
+            candidate.name, tierName, gradeName, wage))
+end
+
+--- YesNoDialog callback for hiring. On YES, hire the stashed candidate and refresh
+--- the roster. Either way refresh Hire — updates the (possibly smaller) pool and
+--- resets the row selection so the clicked row's highlight doesn't linger.
+function FarmHandShellScreen:onHireConfirmed(yes)
+    local candidateId = self.pendingHireId
+    self.pendingHireId = nil
+
+    if yes and candidateId ~= nil then
+        local manager = FarmHand.manager
+        if manager ~= nil then
+            manager:hireCandidate(candidateId)
+        end
+        self:refreshRoster()
     end
 
     self:refreshHire()
-    self:refreshRoster()
 end
 
 --- ESC / Back: close the shell and return to the game.
