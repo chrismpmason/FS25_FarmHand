@@ -121,7 +121,7 @@ local function onUpdateAIFieldWorker(self, dt)
     -- Experience-to-wear. When ADS owns the damage model, the per-job instance
     -- override (installed at job start) does the scaling, so write no vanilla
     -- wear here. Otherwise rescale vanilla wear directly.
-    if not FarmHandWear.adsPresent then
+    if not FarmHandWear.adsPresent and manager.settings:getExperienceWearEnabled() then
         FarmHandWear.applyToCombination(self, hand, manager.settings)
     end
 end

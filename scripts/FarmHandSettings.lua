@@ -11,6 +11,9 @@ FarmHandSettings = {}
 
 local FarmHandSettings_mt = Class(FarmHandSettings)
 
+-- Global mod settings file (not per-savegame), under the player's FS profile.
+local SETTINGS_FILE = "modSettings/FS25_FarmHand.xml"
+
 function FarmHandSettings.new()
     local self = setmetatable({}, FarmHandSettings_mt)
 
@@ -35,6 +38,13 @@ function FarmHandSettings.new()
     self.wearGreen = 1.75  -- green (zero hectares): hardest on machinery
     self.wearK = 100       -- hectares constant; lower = faster early improvement
 
+    -- Master switch for the experience-to-wear scaling above. When FALSE, FarmHand
+    -- installs NO wear override at all — ADS / vanilla wear behave exactly as they
+    -- would without this mod (it writes none of ADS's own fields, so this can't
+    -- corrupt a save; it just stops scaling). Speed and everything else are
+    -- unaffected. For players on hard wear setups. Read from the modSettings file.
+    self.experienceWearEnabled = true
+
     -- Leave-risk / synthetic market value. A hand's market wage is base plus a
     -- per-cert bonus (deliberately ABOVE the 500 actually paid) plus an
     -- experience bonus, so trained/experienced hands become underpaid.
@@ -50,14 +60,42 @@ function FarmHandSettings.new()
     return self
 end
 
---- Restore settings from the savegame / mod settings file.
+--- Restore settings from the global mod settings file. Creates it with defaults
+--- on first run so the player has a file to edit. Only the wear off-switch is
+--- read for now; other values stay at their code defaults until surfaced.
 function FarmHandSettings:load()
-    -- TODO(slice 1): read persisted values; fall back to the defaults above.
+    local path = getUserProfileAppPath() .. SETTINGS_FILE
+
+    if not fileExists(path) then
+        self:save() -- write defaults the player can edit
+        return
+    end
+
+    local xmlFile = loadXMLFile("FarmHandSettings", path)
+    if xmlFile == nil or xmlFile == 0 then
+        return
+    end
+    self.experienceWearEnabled =
+        Utils.getNoNil(getXMLBool(xmlFile, "farmHand.experienceWearEnabled"), self.experienceWearEnabled)
+    delete(xmlFile)
 end
 
---- Persist current settings.
+--- Persist current settings to the global mod settings file.
 function FarmHandSettings:save()
-    -- TODO(slice 1): write values to the mod settings file.
+    createFolder(getUserProfileAppPath() .. "modSettings/")
+    local path = getUserProfileAppPath() .. SETTINGS_FILE
+
+    local xmlFile = createXMLFile("FarmHandSettings", path, "farmHand")
+    if xmlFile == nil or xmlFile == 0 then
+        return
+    end
+    setXMLBool(xmlFile, "farmHand.experienceWearEnabled", self.experienceWearEnabled)
+    saveXMLFile(xmlFile)
+    delete(xmlFile)
+end
+
+function FarmHandSettings:getExperienceWearEnabled()
+    return self.experienceWearEnabled
 end
 
 function FarmHandSettings:getCourseDurationMultiplier()

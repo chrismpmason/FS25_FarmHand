@@ -145,8 +145,9 @@ function FarmHand.onAIJobStart(self, farmId, ...)
 
         -- ADS path: scale this hand's vehicles' wear with a per-instance override
         -- (removed at job end). Instance-field shadowing is independent of the
-        -- load/finalize order that defeats a class-level wrap.
-        if FarmHandWear.adsPresent then
+        -- load/finalize order that defeats a class-level wrap. Skipped entirely when
+        -- the experience-wear setting is off (ADS then behaves exactly as vanilla).
+        if FarmHandWear.adsPresent and manager.settings:getExperienceWearEnabled() then
             self._farmHandAdsVehicles =
                 FarmHandWear.applyADSOverride(rootVehicle, hand, manager.settings, wearBoost)
         end

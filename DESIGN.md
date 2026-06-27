@@ -143,6 +143,18 @@ of ADS's fields — one-owner respected.
 - extraConditionWear is ADS-owned (breakdown effects write/reset it) — left untouched.
 - Without ADS: vanilla applyToCombination path, unchanged.
 
+**Off-switch — `experienceWearEnabled` (default ON).** A global mod setting. When OFF, FarmHand
+installs NO wear override at all — ADS / vanilla wear behave exactly as they would without this
+mod. It writes none of ADS's own fields, so OFF cannot corrupt a save; it just stops scaling.
+Speed and everything else are unaffected. Intended for players on hard ADS setups who don't want
+green-hand wear (~x1.75) stacking on already-harsh damage. Read from the modSettings file at
+mission load (auto-created with defaults on first run):
+
+- Windows: `Documents\My Games\FarmingSimulator2025\modSettings\FS25_FarmHand.xml`
+- macOS: `~/Library/Application Support/FarmingSimulator2025/modSettings/FS25_FarmHand.xml`
+- Edit `<experienceWearEnabled>false</experienceWearEnabled>` and reload. Global; persists across
+  sessions and saves.
+
 ### Experience tiers — IMPLEMENTED (8393388)
 
 Three proficiency tiers — Novice / Experienced / Master — computed from the single experience
