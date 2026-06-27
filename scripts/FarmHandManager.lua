@@ -57,6 +57,14 @@ FarmHandManager.CANDIDATE_PRECERT_CHANCE = { 0.0, 0.25, 0.60 } -- skilled-cert c
 -- before this one).
 local SKILLED_CERTS = { FarmHandCertificate.PESTICIDES }
 
+-- College (Slice A: the single pre-existing spraying course). Tuition is a one-off
+-- fee charged on enrolment; COURSE_COMPLETION_XP is folded into experience whenever
+-- a course completes. SPRAY_MONTHS is the base length before the settings duration
+-- multiplier. All tunable.
+FarmHandManager.COLLEGE_SPRAY_TUITION = 800
+FarmHandManager.COLLEGE_SPRAY_MONTHS = 3
+FarmHandManager.COURSE_COMPLETION_XP = 25
+
 local FarmHandManager_mt = Class(FarmHandManager)
 
 -- Name pools for generating green candidates. Small hardcoded lists; a first
@@ -589,6 +597,66 @@ function FarmHandManager:enrollCourse(worker, targetCert, baseMonths)
     worker:enrollCourse(targetCert, length)
 end
 
+--- Current farm balance, or nil if it can't be resolved. farm:getBalance() is the
+--- accessor used by BetterContracts / EasyDevControls / RealisticLivestock; falls
+--- back to the farm.money field.
+function FarmHandManager:getFarmBalance()
+    local farmId = g_currentMission ~= nil and g_currentMission:getFarmId() or nil
+    local farm = farmId ~= nil and g_farmManager:getFarmById(farmId) or nil
+    if farm ~= nil and farm.getBalance ~= nil then
+        return farm:getBalance()
+    end
+    if farm ~= nil and farm.money ~= nil then
+        return farm.money
+    end
+    -- Last-resort fallback: the mission-level accessor (used by ADS / RL).
+    if g_currentMission ~= nil and g_currentMission.getMoney ~= nil then
+        return g_currentMission:getMoney()
+    end
+    return nil
+end
+
+--- The actual enrolled length (months) for the spraying course after the settings
+--- duration multiplier — matches what enrollCourse will set.
+function FarmHandManager:getSprayCourseLength()
+    local multiplier = self.settings:getCourseDurationMultiplier()
+    return math.max(1, math.floor(FarmHandManager.COLLEGE_SPRAY_MONTHS * multiplier + 0.5))
+end
+
+--- True if the farm can currently afford the spraying tuition.
+function FarmHandManager:canAffordSprayCourse()
+    local balance = self:getFarmBalance()
+    return balance ~= nil and balance >= FarmHandManager.COLLEGE_SPRAY_TUITION
+end
+
+--- Charge the spraying tuition from the farm and enrol the worker on the course.
+--- Atomic: re-checks eligibility + funds, deducts via the proven addMoney
+--- passthrough path (same guard payWages uses, so a mid-job enrolment isn't eaten
+--- by the helper-fee suppression), then enrols. Returns true on success.
+function FarmHandManager:enrollSprayCourse(worker)
+    if worker == nil or worker:isEnrolled()
+        or worker:hasCertificate(FarmHandCertificate.PESTICIDES) then
+        return false
+    end
+    if not self:canAffordSprayCourse() then
+        return false
+    end
+
+    local farmId = g_currentMission ~= nil and g_currentMission:getFarmId() or nil
+    local farm = farmId ~= nil and g_farmManager:getFarmById(farmId) or nil
+    if farm == nil then
+        return false
+    end
+
+    self.moneyPassthrough = true
+    g_currentMission:addMoney(-FarmHandManager.COLLEGE_SPRAY_TUITION, farm:getId(),
+        MoneyType.AI or MoneyType.WAGES or MoneyType.OTHER, true, true)
+    self.moneyPassthrough = false
+
+    self:enrollCourse(worker, FarmHandCertificate.PESTICIDES, FarmHandManager.COLLEGE_SPRAY_MONTHS)
+    return true
+end
+
 -- =========================================================================
 -- Wages.
 -- =========================================================================
@@ -697,6 +765,8 @@ function FarmHandManager:advanceCourses()
 
             if worker.courseProgress >= worker.courseLength then
                 worker:grantCertificate(worker.targetCert)
+                -- Completion bonus: a chunk of experience for the qualification.
+                worker.hectaresWorked = worker.hectaresWorked + FarmHandManager.COURSE_COMPLETION_XP
                 worker:clearCourse()
             end
         end

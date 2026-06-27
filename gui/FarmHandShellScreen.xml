@@ -103,7 +103,29 @@
             <Text profile="shell_hint" text="Click a candidate to hire them." position="20px -700px"/>
         </GuiElement>
 
-        <Text profile="farmHandShell_placeholder" id="paneCollege"  text="College (placeholder)"/>
+        <!-- COLLEGE pane: employees + course status; click an available hand to
+             enrol (with tuition confirm). Reuses the Employees list profiles. -->
+        <GuiElement profile="farmHandShell_pane" id="paneCollege">
+            <Text profile="shell_colHeader" text="Name"   position="20px 0px"/>
+            <Text profile="shell_colHeader" text="Status" position="380px 0px"/>
+
+            <GuiElement profile="shell_listContainer" id="collegeListContainer">
+                <SmoothList profile="shell_handList" id="collegeList" startClipperElementName="collegeStart" endClipperElementName="collegeStop">
+                    <ListItem profile="shell_listItem" onClick="onClickStudent">
+                        <Bitmap profile="shell_listItemBg" name="bg"/>
+                        <Text profile="shell_cellName"   name="name"/>
+                        <Text profile="shell_cellStatus" name="status"/>
+                    </ListItem>
+                </SmoothList>
+                <Bitmap profile="fs25_secondaryMenuStartClipper" name="collegeStart"/>
+                <Bitmap profile="fs25_secondaryMenuStopClipper" name="collegeStop" position="0px -700px"/>
+                <ThreePartBitmap profile="fs25_subCategoryListSliderBox" position="20px 0px">
+                    <Slider profile="fs25_animalTargetListSlider" id="collegeSlider" dataElementId="collegeList"/>
+                </ThreePartBitmap>
+            </GuiElement>
+
+            <Text profile="shell_hint" id="collegeInfo" position="20px -700px"/>
+        </GuiElement>
         <!-- OVERVIEW pane: summary stats (label/value rows, NOT a list). Values
              set in refreshOverview (on open + on Overview select). -->
         <GuiElement profile="farmHandShell_pane" id="paneOverview">
@@ -258,6 +280,11 @@
             <width value="340px"/>
             <position value="20px 0px"/>
             <textSize value="24px"/>
+        </Profile>
+        <Profile name="shell_cellStatus" extends="fs25_textDefault" with="anchorMiddleLeft">
+            <width value="880px"/>
+            <position value="380px 0px"/>
+            <textSize value="22px"/>
         </Profile>
         <Profile name="shell_cellTier" extends="fs25_textDefault" with="anchorMiddleLeft">
             <width value="280px"/>

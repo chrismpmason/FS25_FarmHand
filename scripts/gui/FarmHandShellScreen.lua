@@ -50,6 +50,7 @@ function FarmHandShellScreen.new(target, customMt)
     -- Snapshots for the lists (rebuilt on open / tab select / change).
     self.rosterHands = {}
     self.candidates = {}
+    self.students = {}
 
     return self
 end
@@ -69,6 +70,10 @@ function FarmHandShellScreen:onGuiSetupFinished()
     if self.hireList ~= nil then
         FocusManager:linkElements(self.hireList, FocusManager.TOP, nil)
         FocusManager:linkElements(self.hireList, FocusManager.BOTTOM, nil)
+    end
+    if self.collegeList ~= nil then
+        FocusManager:linkElements(self.collegeList, FocusManager.TOP, nil)
+        FocusManager:linkElements(self.collegeList, FocusManager.BOTTOM, nil)
     end
 
     -- Bind each tab icon to its matching line-art .dds (re-encoded with nvcompress;
@@ -130,6 +135,8 @@ function FarmHandShellScreen:selectTab(index)
         self:refreshRoster()
     elseif index == 2 then
         self:refreshHire()
+    elseif index == 3 then
+        self:refreshCollege()
     elseif index == 4 then
         self:refreshOverview()
     end
@@ -187,6 +194,9 @@ function FarmHandShellScreen:getNumberOfItemsInSection(list, section)
         -- At least one row so the empty-pool placeholder can render.
         return math.max(1, self.candidates ~= nil and #self.candidates or 0)
     end
+    if list == self.collegeList then
+        return self.students ~= nil and #self.students or 0
+    end
     return self.rosterHands ~= nil and #self.rosterHands or 0
 end
 
@@ -197,6 +207,8 @@ end
 function FarmHandShellScreen:populateCellForItemInSection(list, section, index, cell)
     if list == self.hireList then
         self:populateCandidateCell(index, cell)
+    elseif list == self.collegeList then
+        self:populateStudentCell(index, cell)
     else
         self:populateHandCell(index, cell)
     end
@@ -452,6 +464,120 @@ function FarmHandShellScreen:refreshOverview()
         and (active.name .. " — " .. (isWorking and "Working" or "Idle"))
         or "None selected")
     set(self.ovCandidates, tostring(candidates))
+end
+
+-- ---- College pane (enrol -> study -> complete) ----------------------------
+
+--- Rebuild the student snapshot and the course/tuition info line, then reload.
+function FarmHandShellScreen:refreshCollege()
+    local mgr = FarmHand.manager
+    self.students = mgr ~= nil and mgr:getWorkersList() or {}
+
+    if self.collegeInfo ~= nil and mgr ~= nil then
+        self.collegeInfo:setText(string.format(
+            "Spraying course — grants the Pesticides certificate. Tuition £%d, %d months. Click an available hand to enrol.",
+            FarmHandManager.COLLEGE_SPRAY_TUITION, mgr:getSprayCourseLength()))
+    end
+
+    if self.collegeList ~= nil then
+        self.collegeList:reloadData()
+    end
+end
+
+-- College row: name + course status. Slice A has one course (Spraying), so an
+-- enrolled hand is studying for the pesticides cert.
+function FarmHandShellScreen:populateStudentCell(index, cell)
+    local hand = self.students ~= nil and self.students[index] or nil
+    if hand == nil then
+        return
+    end
+
+    local nameEl = cell:getAttribute("name")
+    if nameEl ~= nil then nameEl:setText(hand.name) end
+
+    local status, bright
+    if hand:hasCertificate(FarmHandCertificate.PESTICIDES) then
+        status, bright = "Qualified: Spraying", true
+    elseif hand:isEnrolled() then
+        status, bright = string.format("Studying: Spraying (%d/%d mo)",
+            hand.courseProgress or 0, hand.courseLength or 0), true
+    else
+        status, bright = "Available to enrol", false
+    end
+
+    local statusEl = cell:getAttribute("status")
+    if statusEl ~= nil then
+        statusEl:setText(status)
+        local shade = bright and 1.0 or 0.7
+        statusEl:setTextColor(shade, shade, shade, 1)
+    end
+end
+
+--- Click a hand to enrol. Only valid for one who is NOT already certified and NOT
+--- already enrolled. If the farm can't afford tuition, say so; otherwise confirm.
+function FarmHandShellScreen:onClickStudent(item)
+    local index = item.indexInSection or (self.collegeList ~= nil and self.collegeList.selectedIndex)
+    if index == nil then
+        return
+    end
+    local hand = self.students ~= nil and self.students[index] or nil
+    if hand == nil then
+        return
+    end
+
+    local mgr = FarmHand.manager
+    if mgr == nil then
+        return
+    end
+
+    -- Non-eligible hands: say WHY (a silent no-op reads as broken). Already
+    -- qualified or already studying can't be enrolled.
+    if hand:hasCertificate(FarmHandCertificate.PESTICIDES) then
+        if InfoDialog ~= nil and InfoDialog.show ~= nil then
+            InfoDialog.show(string.format("%s is already qualified in Spraying.", hand.name))
+        end
+        return
+    end
+    if hand:isEnrolled() then
+        if InfoDialog ~= nil and InfoDialog.show ~= nil then
+            InfoDialog.show(string.format("%s is already studying Spraying (%d/%d months).",
+                hand.name, hand.courseProgress or 0, hand.courseLength or 0))
+        end
+        return
+    end
+
+    if not mgr:canAffordSprayCourse() then
+        local msg = string.format("Not enough money for the Spraying tuition (£%d).",
+            FarmHandManager.COLLEGE_SPRAY_TUITION)
+        if InfoDialog ~= nil and InfoDialog.show ~= nil then
+            InfoDialog.show(msg)
+        end
+        return
+    end
+
+    self.pendingEnrollId = hand.id
+    YesNoDialog.show(
+        self.onEnrollConfirmed,
+        self,
+        string.format("Enrol %s on the Spraying course? Tuition £%d, %d months.",
+            hand.name, FarmHandManager.COLLEGE_SPRAY_TUITION, mgr:getSprayCourseLength()))
+end
+
+function FarmHandShellScreen:onEnrollConfirmed(yes)
+    local handId = self.pendingEnrollId
+    self.pendingEnrollId = nil
+    if not yes or handId == nil then
+        return
+    end
+
+    local mgr = FarmHand.manager
+    local hand = mgr ~= nil and mgr.workers ~= nil and mgr.workers[handId] or nil
+    if mgr ~= nil and hand ~= nil then
+        mgr:enrollSprayCourse(hand) -- charges tuition + enrols (re-checks funds atomically)
+    end
+
+    self:refreshCollege()
+    self:refreshOverview() -- enrolment doesn't change Overview's stats today, but keep it live
 end
 
 --- ESC / Back: close the shell and return to the game.
