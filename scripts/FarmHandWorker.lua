@@ -50,6 +50,11 @@ function FarmHandWorker.new(id, name)
     self.hectaresWorked = 0      -- lifetime hectares attributed to this hand
     self.workedThisMonth = false -- set when any work is attributed; reset monthly
 
+    -- Proficiency tier (1/2/3) the player was last notified about. PERSISTED. The
+    -- manager baselines it to the hand's current tier when added (so no spurious
+    -- tier-up fires) and bumps it when a crossing is announced. nil until then.
+    self.lastNotifiedTier = nil
+
     -- Driver identity. styleSlot = which vanilla helper's appearance to borrow
     -- (PERSISTED, so the face is stable across reloads). helperIndex = the index
     -- of our per-hand registered helper (RUNTIME only, re-derived each load).

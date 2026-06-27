@@ -195,6 +195,7 @@ function FarmHandManager:saveToXMLFile(path)
         xmlFile:setString(workerKey .. "#id", worker.id)
         xmlFile:setString(workerKey .. "#name", worker.name)
         xmlFile:setFloat(workerKey .. "#hectaresWorked", worker.hectaresWorked or 0)
+        xmlFile:setInt(workerKey .. "#lastNotifiedTier", worker.lastNotifiedTier or self:getTier(worker))
         xmlFile:setInt(workerKey .. "#baseWage", worker.baseWage or 2000)
 
         -- Driver appearance slot + gender (helperIndex is runtime-only, not saved).
@@ -247,6 +248,9 @@ function FarmHandManager:loadFromXMLFile(path)
         if id ~= nil then
             local worker = FarmHandWorker.new(id, xmlFile:getString(workerKey .. "#name", "Hand"))
             worker.hectaresWorked = xmlFile:getFloat(workerKey .. "#hectaresWorked", 0)
+            -- Restore the tier-up marker; old saves (no attribute) default to the
+            -- hand's current tier so the update doesn't fire a spurious tier-up.
+            worker.lastNotifiedTier = xmlFile:getInt(workerKey .. "#lastNotifiedTier", self:getTier(worker))
             worker.baseWage = xmlFile:getInt(workerKey .. "#baseWage", 2000)
             worker.styleSlot = xmlFile:getInt(workerKey .. "#styleSlot", nil)
             worker.isMale = xmlFile:getBool(workerKey .. "#isMale", true)
@@ -289,6 +293,12 @@ function FarmHandManager:addWorker(worker)
         self.workerOrder[#self.workerOrder + 1] = worker.id
     end
     self.workers[worker.id] = worker
+
+    -- Baseline the tier-up marker to the hand's current tier unless it was already
+    -- restored from a save, so adding a hand never fires a spurious tier-up.
+    if worker.lastNotifiedTier == nil then
+        worker.lastNotifiedTier = self:getTier(worker)
+    end
 
     -- Default the active hand to the first one added, until the player picks.
     if self.activeHandId == nil then
@@ -784,11 +794,37 @@ end
 function FarmHandManager:onMonthChanged()
     self:advanceCourses()      -- 1. course progress (only for workers who worked)
     self:tallyExperience()     -- 2. fold the month's hectares into experience
-    self:payWages()            -- 3. debit monthly wages
-    self:runRetentionCheck()   -- 4. roll leave-risk; departures lose course progress
-    self:refreshCandidates()   -- 5. regenerate the hire pool
+    self:checkTierUps()        -- 3. announce any proficiency-tier crossings this month
+    self:payWages()            -- 4. debit monthly wages
+    self:runRetentionCheck()   -- 5. roll leave-risk; departures lose course progress
+    self:refreshCandidates()   -- 6. regenerate the hire pool
 
     self:resetMonthlyCounters()
+end
+
+--- Show an in-game success notification for a milestone event. Guarded so a
+--- missing mission / notification API is a clean no-op, not an error.
+function FarmHandManager:notify(text)
+    if g_currentMission ~= nil and g_currentMission.addIngameNotification ~= nil
+        and FSBaseMission ~= nil then
+        g_currentMission:addIngameNotification(FSBaseMission.INGAME_NOTIFICATION_OK, text)
+    end
+end
+
+--- Announce any hand that crossed UP a proficiency tier since last checked. The
+--- per-hand lastNotifiedTier marker (persisted, baselined when the hand is added)
+--- guards against re-firing at the same tier each month.
+function FarmHandManager:checkTierUps()
+    for _, worker in pairs(self.workers) do
+        local cur = self:getTier(worker)
+        local last = worker.lastNotifiedTier or cur
+        if cur > last then
+            local phrase = (cur >= 3) and "is now a Master"
+                or ("is now " .. (FarmHandManager.TIER_NAMES[cur] or "?"))
+            self:notify(string.format("Farm Hands: %s %s.", worker.name, phrase))
+        end
+        worker.lastNotifiedTier = cur
+    end
 end
 
 --- 1. Advance each enrolled worker's course by one month and grant the
@@ -801,10 +837,13 @@ function FarmHandManager:advanceCourses()
             worker.courseProgress = worker.courseProgress + 1
 
             if worker.courseProgress >= worker.courseLength then
+                local course = self:getCourseByCert(worker.targetCert)
+                local courseName = course ~= nil and course.name or "a course"
                 worker:grantCertificate(worker.targetCert)
                 -- Completion bonus: a chunk of experience for the qualification.
                 worker.hectaresWorked = worker.hectaresWorked + FarmHandManager.COURSE_COMPLETION_XP
                 worker:clearCourse()
+                self:notify(string.format("Farm Hands: %s has qualified in %s.", worker.name, courseName))
             end
         end
     end
