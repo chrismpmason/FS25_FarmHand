@@ -13,6 +13,12 @@
 -- Stored as stable strings so they survive saving without depending on order.
 FarmHandCertificate = {
     PESTICIDES = "pesticides",
+    -- Boost certs (College Slice B): additive string tokens in the same space-
+    -- separated #certificates attribute. Old saves (no token) load unaffected.
+    COMBINE = "combine",
+    SEEDER = "seeder",
+    FERTILISER = "fertiliser",
+    FORAGE = "forage",
 }
 
 FarmHandWorker = {}

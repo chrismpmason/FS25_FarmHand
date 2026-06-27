@@ -15,6 +15,21 @@
 
 FarmHandOperation = {}
 
+-- Operation boost (Slice B2). When the active hand holds the cert matching the
+-- detected operation, speed is scaled UP and wear DOWN, composed on top of the
+-- tier/experience factor. One pair for all four boost operations for now; tunable.
+FarmHandOperation.BOOST_SPEED_FACTOR = 1.15
+FarmHandOperation.BOOST_WEAR_FACTOR = 0.85
+
+-- Operation class -> the College cert that boosts it. SPRAY is a GATE (handled by
+-- FarmHandGate) and OTHER is unclassified, so neither is here: they earn no boost.
+local OPERATION_CERT = {
+    HARVEST = FarmHandCertificate.COMBINE,
+    SEED = FarmHandCertificate.SEEDER,
+    ["FERTILISER-SLURRY"] = FarmHandCertificate.FERTILISER,
+    FORAGE = FarmHandCertificate.FORAGE,
+}
+
 -- Operation specs, checked in priority order AFTER the sprayer split. Sprayer is
 -- handled first (it needs the fill-type split). Names are confirmed against FS25
 -- mod code where possible; any miss surfaces in the OTHER branch's spec dump.
@@ -117,4 +132,21 @@ function FarmHandOperation.classify(rootVehicle)
     end
 
     return "OTHER", "specs=[" .. table.concat(allSpecKeys(vehicles), ", ") .. "]"
+end
+
+--- The cert that boosts an operation class, or nil if it earns no boost
+--- (SPRAY is gated not boosted; OTHER is unclassified).
+function FarmHandOperation.certForClass(class)
+    return OPERATION_CERT[class]
+end
+
+--- The boost the active hand earns for this operation. Returns
+--- speedBoost, wearBoost, certName — (1.0, 1.0, nil) when there is no boost
+--- (not a boost op, or the hand lacks the matching cert).
+function FarmHandOperation.boostFor(hand, class)
+    local cert = OPERATION_CERT[class]
+    if cert == nil or hand == nil or not hand:hasCertificate(cert) then
+        return 1.0, 1.0, nil
+    end
+    return FarmHandOperation.BOOST_SPEED_FACTOR, FarmHandOperation.BOOST_WEAR_FACTOR, cert
 end

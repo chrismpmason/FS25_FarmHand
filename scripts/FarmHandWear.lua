@@ -77,8 +77,11 @@ local function rescaleDamage(cv, mult)
 end
 
 --- Apply the active hand's wear multiplier to the whole combination this tick.
+--- Composes the per-operation wear boost (stashed on the hand at job start by
+--- FarmHand.onAIJobStart; 1.0 when none) on top of the experience multiplier.
 function FarmHandWear.applyToCombination(rootVehicle, hand, settings)
     local mult = hand:getWearMultiplier(settings:getWearFloor(), settings:getWearGreen(), settings:getWearK())
+        * (hand._opWearBoost or 1.0)
 
     local children = rootVehicle.childVehicles or { rootVehicle }
     for _, cv in pairs(children) do
@@ -119,12 +122,13 @@ FarmHandWear.adsPresent = false
 --- active hand's experience factor (captured now, for this job). Returns the list
 --- of wrapped vehicles for removeADSOverride to restore at job end. Scales only
 --- the input passed to ADS's own function; touches none of ADS's fields.
-function FarmHandWear.applyADSOverride(rootVehicle, hand, settings)
+function FarmHandWear.applyADSOverride(rootVehicle, hand, settings, wearBoost)
     if rootVehicle == nil then
         return nil
     end
 
     local factor = hand:getWearMultiplier(settings:getWearFloor(), settings:getWearGreen(), settings:getWearK())
+        * (wearBoost or 1.0)
 
     local wrapped = {}
     local seen = {}

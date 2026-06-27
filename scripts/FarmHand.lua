@@ -132,23 +132,28 @@ function FarmHand.onAIJobStart(self, farmId, ...)
 
         local rootVehicle = FarmHand.getJobRootVehicle(self)
 
-        -- SLICE B1 (LOG-ONLY): classify the operation to de-risk detection before
-        -- any boost is built on it. No cert check, no boost applied here.
-        local opClass, opDetail = FarmHandOperation.classify(rootVehicle)
-        print(string.format("FarmHand [DEBUG]: operation=%s (%s) hand=%s", -- TEMP DEBUG
-            tostring(opClass), tostring(opDetail), tostring(hand.name)))
+        -- Operation detection -> cert-gated boost: if the active hand holds the cert
+        -- matching this operation, scale speed UP / wear DOWN on top of the tier
+        -- factor. Spray is a GATE (FarmHandGate), not a boost.
+        local opClass = FarmHandOperation.classify(rootVehicle)
+        local speedBoost, wearBoost = FarmHandOperation.boostFor(hand, opClass)
+
+        -- The vanilla (non-ADS) per-tick wear path reads the boost off the hand; the
+        -- ADS + speed overrides take it as a param. Cleared at job end.
+        hand._opWearBoost = wearBoost
+        self._farmHandBoostHand = hand
 
         -- ADS path: scale this hand's vehicles' wear with a per-instance override
         -- (removed at job end). Instance-field shadowing is independent of the
         -- load/finalize order that defeats a class-level wrap.
         if FarmHandWear.adsPresent then
             self._farmHandAdsVehicles =
-                FarmHandWear.applyADSOverride(rootVehicle, hand, manager.settings)
+                FarmHandWear.applyADSOverride(rootVehicle, hand, manager.settings, wearBoost)
         end
 
-        -- Proficiency -> speed: lower-tier hands work the field slower (scales the
-        -- root's getSpeedLimit on working passes only; removed at job end).
-        self._farmHandSpeedVehicles = FarmHandSpeed.applyOverride(rootVehicle, hand, manager)
+        -- Proficiency -> speed: lower-tier hands work the field slower; a matching
+        -- cert boosts it (scales the root's getSpeedLimit on working passes only).
+        self._farmHandSpeedVehicles = FarmHandSpeed.applyOverride(rootVehicle, hand, manager, speedBoost)
     end
 end
 
@@ -176,6 +181,12 @@ function FarmHand.onAIJobEnd(self, ...)
     if self._farmHandSpeedVehicles ~= nil then
         FarmHandSpeed.removeOverride(self._farmHandSpeedVehicles)
         self._farmHandSpeedVehicles = nil
+    end
+
+    -- Clear the per-tick wear boost stashed on the hand for this job.
+    if self._farmHandBoostHand ~= nil then
+        self._farmHandBoostHand._opWearBoost = nil
+        self._farmHandBoostHand = nil
     end
 end
 

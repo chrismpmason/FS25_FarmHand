@@ -21,11 +21,16 @@
 
 FarmHandSpeed = {}
 
+-- Safety ceiling on the composed speed factor (tier x operation boost). Never
+-- binds with the current single 1.15 boost (max tier 1.0 x 1.15 = 1.15); guards
+-- against future stacking pushing the working speed unreasonably high. Tunable.
+FarmHandSpeed.MAX_FACTOR = 1.25
+
 --- Install a per-instance getSpeedLimit override on the root vehicle, scaling the
---- returned working limit by the hand's tier speed factor (captured now, for this
---- job). Returns the wrapped-vehicle list for removeOverride, or nil if nothing
---- was wrapped (no method / already wrapped / no vehicle).
-function FarmHandSpeed.applyOverride(rootVehicle, hand, manager)
+--- returned working limit by the hand's tier speed factor, composed with the
+--- per-operation boost (1.0 = none), captured now for this job. Returns the
+--- wrapped-vehicle list for removeOverride, or nil if nothing was wrapped.
+function FarmHandSpeed.applyOverride(rootVehicle, hand, manager, speedBoost)
     if rootVehicle == nil or manager == nil then
         return nil
     end
@@ -33,7 +38,10 @@ function FarmHandSpeed.applyOverride(rootVehicle, hand, manager)
         return nil
     end
 
-    local factor = manager:getTierSpeedFactor(hand)
+    local factor = manager:getTierSpeedFactor(hand) * (speedBoost or 1.0)
+    if factor > FarmHandSpeed.MAX_FACTOR then
+        factor = FarmHandSpeed.MAX_FACTOR
+    end
 
     local orig = rootVehicle.getSpeedLimit
     rootVehicle._farmHandOrigGSL = orig
