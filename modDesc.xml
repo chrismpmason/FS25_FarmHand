@@ -1,23 +1,25 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <modDesc descVersion="105">
     <author>Chris Mason</author>
-    <version>0.2.0.0</version>
+    <version>0.3.0.0</version>
 
     <title>
         <en>FarmHand</en>
     </title>
 
     <description>
-        <en><![CDATA[Hire farm hands and grow them into a capable workforce.
+        <en><![CDATA[Hire farm hands and grow them into a capable workforce, managed
+from a full-screen panel (press K): Employees, Hire, College and an Overview dashboard.
 
-New hands start near-useless: they wear equipment hard and can only handle basic
-tasks. Two separate paths make them better. Experience builds automatically from
-the work they do and steadily reduces the wear, fuel and time they cost you.
-Formal on-the-job courses unlock what they are allowed to do at all — a hand
-cannot touch the sprayer until he has earned his pesticides certificate.
+New hands start near-useless: they wear equipment hard, work slowly, and can only
+handle basic tasks. They improve two ways. Experience builds automatically from the
+work they do, cutting the wear, fuel and time they cost you and promoting them through
+proficiency tiers. Training courses earn certificates — spraying is gated (no herbicide
+without the ticket), while combine, seeder, fertiliser and forage courses make a hand
+faster and gentler on the kit for that operation.
 
-Wages are paid every month, and a well-trained hand who is underpaid may walk.
-Decide who is worth keeping.]]></en>
+Hire from a monthly candidate pool and pay monthly wages. A well-trained hand who is
+underpaid may walk — decide who is worth keeping.]]></en>
     </description>
 
     <iconFilename>icon_FarmHand.dds</iconFilename>
