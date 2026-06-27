@@ -340,12 +340,20 @@ Do not start until tiered random hiring is committed and the current test build'
 
 ---
 
-## 11. College / training — IN DESIGN (learn-on-the-job model)
+## 11. College / training — BUILT (learn-on-the-job model)
 
 Turns the existing course scaffolding (enrol, monthly advance, completion cert-grant, persistence
 — **all already built**) into a player-facing progression feature: a course catalogue, tuition,
 operation-specific boosts, and the College tab UI. The shell (§10) is what gives it the screen
 real estate.
+
+**Shipped** (build 2, learn-on-the-job model as designed below):
+
+- **Slice A** — enrol → tuition → study → completion cert + XP loop, in the College tab (`407a390`).
+- **Slice B1** — operation detection: classify an AI job by implement spec + fill type (`1590e91`).
+- **Slice B2** — cert-gated speed/wear boost, composed on the tier factor at job start (`e7bd8f6`).
+- **Slice B3** — generalised to the full 5-course catalogue with course selection (`c3ae994`).
+- Tuition tiered by course value; the Road/Towing course was dropped (not hookable — see below).
 
 **Study model — LEARN-ON-THE-JOB (decided).** A hand enrolled on a course keeps working; the
 course advances each month the hand actually worked (`workedThisMonth` — the existing
@@ -355,13 +363,15 @@ deliberately not v1: it would mean undoing the working logic and reintroducing a
 
 **Course catalogue (5).** All tuition/duration values are tunable constants.
 
-- **Spray** *(GATE — already built)* — grants the PESTICIDES cert; required to apply herbicide.
-  Tuition £800, 3 months.
-- **Combine** *(BOOST)* — grants COMBINE cert; faster + gentler when harvesting. £600, 3 months.
-- **Seeder** *(BOOST)* — SEEDER cert; faster + gentler when seed drilling. £600, 3 months.
+Tuition is tiered by course value (more valuable ticket = dearer); boost magnitude is one pair
+for all boost courses (+15% speed / −15% wear), not varied per course.
+
+- **Spray** *(GATE)* — grants the PESTICIDES cert; required to apply herbicide. Tuition £800, 3 months.
+- **Combine** *(BOOST)* — grants COMBINE cert; faster + gentler when harvesting. £700, 3 months.
 - **Slurry & Fertiliser** *(BOOST)* — FERTILISER cert; faster + gentler when fertilising/slurry.
   £600, 3 months.
-- **Forage** *(BOOST)* — FORAGE cert; faster + gentler when mowing/tedding/baling. £600, 3 months.
+- **Seeder** *(BOOST)* — SEEDER cert; faster + gentler when seed drilling. £500, 3 months.
+- **Forage** *(BOOST)* — FORAGE cert; faster + gentler when mowing/tedding/baling. £450, 3 months.
 
 **Gate vs boost (the hybrid).**
 

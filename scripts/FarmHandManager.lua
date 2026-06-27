@@ -64,10 +64,10 @@ local SKILLED_CERTS = { FarmHandCertificate.PESTICIDES }
 -- completion. All tunable. (Storage is unchanged — still one .course node per hand.)
 FarmHandManager.COLLEGE_COURSES = {
     { key = "spray",      cert = FarmHandCertificate.PESTICIDES, name = "Spraying",            tuition = 800, months = 3 },
-    { key = "combine",    cert = FarmHandCertificate.COMBINE,    name = "Combine",             tuition = 600, months = 3 },
-    { key = "seeder",     cert = FarmHandCertificate.SEEDER,     name = "Seeder",              tuition = 600, months = 3 },
+    { key = "combine",    cert = FarmHandCertificate.COMBINE,    name = "Combine",             tuition = 700, months = 3 },
     { key = "fertiliser", cert = FarmHandCertificate.FERTILISER, name = "Slurry & Fertiliser", tuition = 600, months = 3 },
-    { key = "forage",     cert = FarmHandCertificate.FORAGE,     name = "Forage",              tuition = 600, months = 3 },
+    { key = "seeder",     cert = FarmHandCertificate.SEEDER,     name = "Seeder",              tuition = 500, months = 3 },
+    { key = "forage",     cert = FarmHandCertificate.FORAGE,     name = "Forage",              tuition = 450, months = 3 },
 }
 FarmHandManager.COURSE_COMPLETION_XP = 25
 
