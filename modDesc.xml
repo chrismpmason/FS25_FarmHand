@@ -30,17 +30,11 @@ Decide who is worth keeping.]]></en>
 
     <actions>
         <action name="FARMHAND_OPEN" axisType="HALF"/>
-        <!-- TEMP (build-2 sub-slice 1): open the full-screen shell; removed when K is swapped over. -->
-        <action name="FARMHAND_SHELL" axisType="HALF"/>
     </actions>
 
     <inputBinding>
         <actionBinding action="FARMHAND_OPEN">
             <binding device="KB_MOUSE_DEFAULT" input="KEY_k"/>
-        </actionBinding>
-        <!-- TEMP (build-2 sub-slice 1): full-screen shell on J, separate from K. -->
-        <actionBinding action="FARMHAND_SHELL">
-            <binding device="KB_MOUSE_DEFAULT" input="KEY_j"/>
         </actionBinding>
     </inputBinding>
 
@@ -68,9 +62,6 @@ Decide who is worth keeping.]]></en>
         </text>
         <text name="input_FARMHAND_OPEN">
             <en>Farm Hands panel</en>
-        </text>
-        <text name="input_FARMHAND_SHELL">
-            <en>Farm Hands shell (WIP)</en>
         </text>
     </l10n>
 </modDesc>

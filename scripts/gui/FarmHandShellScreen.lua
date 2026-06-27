@@ -1,18 +1,15 @@
 --
 -- FarmHandShellScreen
 --
--- Build-2 UI rebuild. SUB-SLICE 1 built the empty tabbed shell; SUB-SLICE 2 ports
--- the Roster view into its pane (live hand list: click to set active, dismiss with
--- confirm). Hire / College / Overview stay placeholders, ported in later slices.
+-- Build-2 UI rebuild: the full-screen tabbed panel that REPLACED the legacy K
+-- dialog. Four tabs — Employees (set active / dismiss), Hire (candidate pool),
+-- College (enrol / study), Overview (workforce dashboard) — all reading the same
+-- manager state. Opened on K (see FarmHand.onOpenFarmHands).
 --
 -- A custom ScreenElement (NOT the heavy TabbedMenu machinery) — most self-
 -- contained for a mod and least likely to fight the layout system. Loaded via
 -- g_gui:loadGui, shown with g_gui:showGui, closed via onClickBack -> showGui("").
--- The Roster list reuses the K dialog's proven SmoothList pattern and reads the
--- SAME manager state (no manager/logic changes). The K dialog stays untouched.
---
--- The existing K dialog (FarmHandsDialog) is deliberately untouched and keeps
--- working; this shell opens on a TEMPORARY key while it is built out.
+-- Lists reuse the (now retired) dialog's proven SmoothList pattern.
 --
 
 FarmHandShellScreen = {}

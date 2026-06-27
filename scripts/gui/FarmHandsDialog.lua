@@ -1,5 +1,11 @@
 --
--- FarmHandsDialog
+-- FarmHandsDialog  [RETIRED — pre-shell legacy dialog]
+--
+-- Superseded in build 2 by FarmHandShellScreen (the full-screen tabbed shell,
+-- opened on K). This file and its XML are kept ONE VERSION as a fallback but are
+-- no longer sourced or registered by FarmHand.lua — nothing opens it. Safe to
+-- delete next version. To revive: re-add it to the source list + call register()
+-- and point a key at FarmHandsDialog.show().
 --
 -- Modal roster panel. Lists the employed hands (name + held certificates) and
 -- lets the player click one to make it the active hand. Subclass of the base

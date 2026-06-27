@@ -29,7 +29,9 @@ local sourceFiles = {
     "scripts/FarmHandWorkDetector.lua",
     "scripts/FarmHandWear.lua",
     "scripts/FarmHandSpeed.lua",
-    "scripts/gui/FarmHandsDialog.lua",
+    -- FarmHandsDialog (the legacy K dialog) is RETIRED: the shell replaced it in
+    -- build 2. Its files are kept one version as a fallback but are no longer
+    -- sourced/registered. Re-add this line + register()/a key to revive it.
     "scripts/gui/FarmHandShellScreen.lua",
 }
 
@@ -58,11 +60,8 @@ function FarmHand:onMissionLoad(mission)
     -- FarmHandGate.install() is guarded so it only wraps the base functions once.
     FarmHandGate.install()
 
-    -- Load the Farm Hands panel GUI (guarded so it only loads once).
-    FarmHandsDialog.register()
-
-    -- TEMP (build-2 sub-slice 1): load the empty full-screen tabbed shell so the
-    -- temp key can open it. Does NOT touch the K dialog above.
+    -- Load the Farm Hands panel GUI: the full-screen shell, opened on K.
+    -- (The legacy FarmHandsDialog is retired and no longer registered.)
     FarmHandShellScreen.register()
 
     -- Bind the open-panel key. Done here (not at script load) because the
@@ -277,31 +276,17 @@ function FarmHand.onRegisterPlayerActionEvents(playerInputComponent)
 
     g_inputBinding:beginActionEventsModification(PlayerInputComponent.INPUT_CONTEXT_NAME)
     local _, eventId = g_inputBinding:registerActionEvent(InputAction.FARMHAND_OPEN, FarmHand, FarmHand.onOpenFarmHands, false, true, false, true)
-
-    -- TEMP (build-2 sub-slice 1): open the empty full-screen shell. Separate key
-    -- from K — K must keep opening the existing dialog. A NEW binding only
-    -- registers after a full game restart. Removed when K is swapped over.
-    local _, shellEventId = g_inputBinding:registerActionEvent(InputAction.FARMHAND_SHELL, FarmHand, FarmHand.onOpenShell, false, true, false, true)
     g_inputBinding:endActionEventsModification()
 
     if eventId ~= nil then
         g_inputBinding:setActionEventText(eventId, g_i18n:getText("input_FARMHAND_OPEN"))
         g_inputBinding:setActionEventTextVisibility(eventId, true)
     end
-    if shellEventId ~= nil then
-        g_inputBinding:setActionEventText(shellEventId, g_i18n:getText("input_FARMHAND_SHELL"))
-        g_inputBinding:setActionEventTextVisibility(shellEventId, true)
-    end
 end
 
---- TEMP open callback for the full-screen shell (build-2 sub-slice 1).
-function FarmHand.onOpenShell(self, actionName, inputValue)
-    FarmHandShellScreen.show()
-end
-
---- Open-panel action callback.
+--- Open-panel action callback (K). Opens the full-screen shell.
 function FarmHand.onOpenFarmHands(self, actionName, inputValue)
-    FarmHandsDialog.show()
+    FarmHandShellScreen.show()
 end
 
 --- Tear the manager down when the mission ends so a fresh game starts clean.
