@@ -102,6 +102,11 @@ local function inspectCombination(vehicle)
     return hasSprayer, isHerbicide, fillType, sprayIndex
 end
 
+-- Exposed for reuse: FarmHandOperation classifies a job's operation from the same
+-- combination walk (the sprayer family, split by fill type). Returns
+-- hasSprayer, isHerbicide, fillType, sprayIndex.
+FarmHandGate.inspectCombination = inspectCombination
+
 --- True if the combination is set to apply herbicide.
 local function combinationAppliesHerbicide(vehicle)
     local _, isHerbicide = inspectCombination(vehicle)

@@ -29,6 +29,7 @@ local sourceFiles = {
     "scripts/FarmHandWorkDetector.lua",
     "scripts/FarmHandWear.lua",
     "scripts/FarmHandSpeed.lua",
+    "scripts/FarmHandOperation.lua",
     -- FarmHandsDialog (the legacy K dialog) is RETIRED: the shell replaced it in
     -- build 2. Its files are kept one version as a fallback but are no longer
     -- sourced/registered. Re-add this line + register()/a key to revive it.
@@ -130,6 +131,12 @@ function FarmHand.onAIJobStart(self, farmId, ...)
         manager.farmHandJobCount = (manager.farmHandJobCount or 0) + 1
 
         local rootVehicle = FarmHand.getJobRootVehicle(self)
+
+        -- SLICE B1 (LOG-ONLY): classify the operation to de-risk detection before
+        -- any boost is built on it. No cert check, no boost applied here.
+        local opClass, opDetail = FarmHandOperation.classify(rootVehicle)
+        print(string.format("FarmHand [DEBUG]: operation=%s (%s) hand=%s", -- TEMP DEBUG
+            tostring(opClass), tostring(opDetail), tostring(hand.name)))
 
         -- ADS path: scale this hand's vehicles' wear with a per-instance override
         -- (removed at job end). Instance-field shadowing is independent of the
