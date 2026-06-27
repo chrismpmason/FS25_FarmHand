@@ -471,9 +471,13 @@ function FarmHandShellScreen:refreshCollege()
     self.students = mgr ~= nil and mgr:getWorkersList() or {}
 
     if self.collegeInfo ~= nil and mgr ~= nil then
-        self.collegeInfo:setText(string.format(
-            "Spraying course — grants the Pesticides certificate. Tuition £%d, %d months. Click an available hand to enrol.",
-            FarmHandManager.COLLEGE_SPRAY_TUITION, mgr:getSprayCourseLength()))
+        local parts = {}
+        for _, c in ipairs(FarmHandManager.COLLEGE_COURSES) do
+            parts[#parts + 1] = string.format("%s £%d", c.name, c.tuition)
+        end
+        self.collegeInfo:setText("Courses (" .. tostring(mgr:getCourseLength(FarmHandManager.COLLEGE_COURSES[1]))
+            .. " mo each): " .. table.concat(parts, " · ")
+            .. ".  Click an available hand to choose a course.")
     end
 
     if self.collegeList ~= nil then
@@ -481,25 +485,36 @@ function FarmHandShellScreen:refreshCollege()
     end
 end
 
--- College row: name + course status. Slice A has one course (Spraying), so an
--- enrolled hand is studying for the pesticides cert.
+-- College row: name + course status across the catalogue. A hand can hold several
+-- certs over time (one course at a time); enrolled in at most one.
 function FarmHandShellScreen:populateStudentCell(index, cell)
     local hand = self.students ~= nil and self.students[index] or nil
     if hand == nil then
         return
     end
+    local mgr = FarmHand.manager
 
     local nameEl = cell:getAttribute("name")
     if nameEl ~= nil then nameEl:setText(hand.name) end
 
     local status, bright
-    if hand:hasCertificate(FarmHandCertificate.PESTICIDES) then
-        status, bright = "Qualified: Spraying", true
-    elseif hand:isEnrolled() then
-        status, bright = string.format("Studying: Spraying (%d/%d mo)",
-            hand.courseProgress or 0, hand.courseLength or 0), true
+    if hand:isEnrolled() then
+        local course = mgr ~= nil and mgr:getCourseByCert(hand.targetCert) or nil
+        local courseName = course ~= nil and course.name or "a course"
+        status, bright = string.format("Studying: %s (%d/%d mo)",
+            courseName, hand.courseProgress or 0, hand.courseLength or 0), true
     else
-        status, bright = "Available to enrol", false
+        local held = {}
+        for _, c in ipairs(FarmHandManager.COLLEGE_COURSES) do
+            if hand:hasCertificate(c.cert) then
+                held[#held + 1] = c.name
+            end
+        end
+        if #held > 0 then
+            status, bright = "Qualified: " .. table.concat(held, ", "), true
+        else
+            status, bright = "Available to enrol", false
+        end
     end
 
     local statusEl = cell:getAttribute("status")
@@ -510,8 +525,8 @@ function FarmHandShellScreen:populateStudentCell(index, cell)
     end
 end
 
---- Click a hand to enrol. Only valid for one who is NOT already certified and NOT
---- already enrolled. If the farm can't afford tuition, say so; otherwise confirm.
+--- Click a hand -> pick a course they don't yet hold (OptionDialog), then confirm
+--- the spend. Already-studying hands can't take a second course.
 function FarmHandShellScreen:onClickStudent(item)
     local index = item.indexInSection or (self.collegeList ~= nil and self.collegeList.selectedIndex)
     if index == nil then
@@ -527,50 +542,90 @@ function FarmHandShellScreen:onClickStudent(item)
         return
     end
 
-    -- Non-eligible hands: say WHY (a silent no-op reads as broken). Already
-    -- qualified or already studying can't be enrolled.
-    if hand:hasCertificate(FarmHandCertificate.PESTICIDES) then
-        if InfoDialog ~= nil and InfoDialog.show ~= nil then
-            InfoDialog.show(string.format("%s is already qualified in Spraying.", hand.name))
-        end
-        return
-    end
+    -- Already studying: one course at a time (say why, not a silent no-op).
     if hand:isEnrolled() then
+        local course = mgr:getCourseByCert(hand.targetCert)
+        local name = course ~= nil and course.name or "a course"
         if InfoDialog ~= nil and InfoDialog.show ~= nil then
-            InfoDialog.show(string.format("%s is already studying Spraying (%d/%d months).",
-                hand.name, hand.courseProgress or 0, hand.courseLength or 0))
+            InfoDialog.show(string.format("%s is already studying %s (%d/%d months).",
+                hand.name, name, hand.courseProgress or 0, hand.courseLength or 0))
         end
         return
     end
 
-    if not mgr:canAffordSprayCourse() then
-        local msg = string.format("Not enough money for the Spraying tuition (£%d).",
-            FarmHandManager.COLLEGE_SPRAY_TUITION)
+    -- Courses this hand can still take (doesn't already hold the cert).
+    local eligible, labels = {}, {}
+    for _, c in ipairs(FarmHandManager.COLLEGE_COURSES) do
+        if not hand:hasCertificate(c.cert) then
+            eligible[#eligible + 1] = c
+            labels[#labels + 1] = string.format("%s  —  £%d, %d mo", c.name, c.tuition, mgr:getCourseLength(c))
+        end
+    end
+
+    if #eligible == 0 then
         if InfoDialog ~= nil and InfoDialog.show ~= nil then
-            InfoDialog.show(msg)
+            InfoDialog.show(string.format("%s is already qualified in every course.", hand.name))
         end
         return
     end
 
-    self.pendingEnrollId = hand.id
+    -- Course pick -> spend confirm. OptionDialog gives the 1-based pick (<=0 cancel).
+    if OptionDialog ~= nil and OptionDialog.show ~= nil then
+        local handId = hand.id
+        OptionDialog.show(
+            function(choice)
+                if choice ~= nil and choice > 0 and choice <= #eligible then
+                    self:promptEnrollConfirm(handId, eligible[choice])
+                end
+            end,
+            string.format("Choose a course for %s", hand.name),
+            "",
+            labels)
+    else
+        self:promptEnrollConfirm(hand.id, eligible[1]) -- fallback: first eligible
+    end
+end
+
+--- Afford-check the chosen course, then confirm the spend with YesNoDialog.
+function FarmHandShellScreen:promptEnrollConfirm(handId, course)
+    local mgr = FarmHand.manager
+    if mgr == nil or course == nil then
+        return
+    end
+
+    if not mgr:canAffordCourse(course) then
+        if InfoDialog ~= nil and InfoDialog.show ~= nil then
+            InfoDialog.show(string.format("Not enough money for the %s tuition (£%d).",
+                course.name, course.tuition))
+        end
+        return
+    end
+
+    self.pendingEnrollId = handId
+    self.pendingCourseKey = course.key
+
+    local hand = mgr.workers ~= nil and mgr.workers[handId] or nil
+    local name = hand ~= nil and hand.name or "this hand"
     YesNoDialog.show(
         self.onEnrollConfirmed,
         self,
-        string.format("Enrol %s on the Spraying course? Tuition £%d, %d months.",
-            hand.name, FarmHandManager.COLLEGE_SPRAY_TUITION, mgr:getSprayCourseLength()))
+        string.format("Enrol %s on the %s course? Tuition £%d, %d months.",
+            name, course.name, course.tuition, mgr:getCourseLength(course)))
 end
 
 function FarmHandShellScreen:onEnrollConfirmed(yes)
     local handId = self.pendingEnrollId
+    local courseKey = self.pendingCourseKey
     self.pendingEnrollId = nil
-    if not yes or handId == nil then
+    self.pendingCourseKey = nil
+    if not yes or handId == nil or courseKey == nil then
         return
     end
 
     local mgr = FarmHand.manager
     local hand = mgr ~= nil and mgr.workers ~= nil and mgr.workers[handId] or nil
     if mgr ~= nil and hand ~= nil then
-        mgr:enrollSprayCourse(hand) -- charges tuition + enrols (re-checks funds atomically)
+        mgr:enrollInCourse(hand, courseKey) -- charges tuition + enrols (re-checks atomically)
     end
 
     self:refreshCollege()

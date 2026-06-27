@@ -57,12 +57,18 @@ FarmHandManager.CANDIDATE_PRECERT_CHANCE = { 0.0, 0.25, 0.60 } -- skilled-cert c
 -- before this one).
 local SKILLED_CERTS = { FarmHandCertificate.PESTICIDES }
 
--- College (Slice A: the single pre-existing spraying course). Tuition is a one-off
--- fee charged on enrolment; COURSE_COMPLETION_XP is folded into experience whenever
--- a course completes. SPRAY_MONTHS is the base length before the settings duration
--- multiplier. All tunable.
-FarmHandManager.COLLEGE_SPRAY_TUITION = 800
-FarmHandManager.COLLEGE_SPRAY_MONTHS = 3
+-- College course catalogue (Slice B3). Each entry: the cert it grants, display
+-- name, one-off tuition (£), and base length in months (before the settings
+-- duration multiplier). One active course per hand; completing one frees them to
+-- enrol in another. COURSE_COMPLETION_XP is folded into experience on any course's
+-- completion. All tunable. (Storage is unchanged — still one .course node per hand.)
+FarmHandManager.COLLEGE_COURSES = {
+    { key = "spray",      cert = FarmHandCertificate.PESTICIDES, name = "Spraying",            tuition = 800, months = 3 },
+    { key = "combine",    cert = FarmHandCertificate.COMBINE,    name = "Combine",             tuition = 600, months = 3 },
+    { key = "seeder",     cert = FarmHandCertificate.SEEDER,     name = "Seeder",              tuition = 600, months = 3 },
+    { key = "fertiliser", cert = FarmHandCertificate.FERTILISER, name = "Slurry & Fertiliser", tuition = 600, months = 3 },
+    { key = "forage",     cert = FarmHandCertificate.FORAGE,     name = "Forage",              tuition = 600, months = 3 },
+}
 FarmHandManager.COURSE_COMPLETION_XP = 25
 
 local FarmHandManager_mt = Class(FarmHandManager)
@@ -616,29 +622,60 @@ function FarmHandManager:getFarmBalance()
     return nil
 end
 
---- The actual enrolled length (months) for the spraying course after the settings
---- duration multiplier — matches what enrollCourse will set.
-function FarmHandManager:getSprayCourseLength()
+--- Catalogue entry for a course key, or nil.
+function FarmHandManager:getCourse(courseKey)
+    for _, c in ipairs(FarmHandManager.COLLEGE_COURSES) do
+        if c.key == courseKey then
+            return c
+        end
+    end
+    return nil
+end
+
+--- Catalogue entry whose granted cert matches `cert`, or nil. Used to name a
+--- hand's held / in-progress certificate for display.
+function FarmHandManager:getCourseByCert(cert)
+    for _, c in ipairs(FarmHandManager.COLLEGE_COURSES) do
+        if c.cert == cert then
+            return c
+        end
+    end
+    return nil
+end
+
+--- Enrolled length (months) for a course after the settings duration multiplier —
+--- matches what enrollCourse will set.
+function FarmHandManager:getCourseLength(course)
+    if course == nil then
+        return 0
+    end
     local multiplier = self.settings:getCourseDurationMultiplier()
-    return math.max(1, math.floor(FarmHandManager.COLLEGE_SPRAY_MONTHS * multiplier + 0.5))
+    return math.max(1, math.floor(course.months * multiplier + 0.5))
 end
 
---- True if the farm can currently afford the spraying tuition.
-function FarmHandManager:canAffordSprayCourse()
-    local balance = self:getFarmBalance()
-    return balance ~= nil and balance >= FarmHandManager.COLLEGE_SPRAY_TUITION
-end
-
---- Charge the spraying tuition from the farm and enrol the worker on the course.
---- Atomic: re-checks eligibility + funds, deducts via the proven addMoney
---- passthrough path (same guard payWages uses, so a mid-job enrolment isn't eaten
---- by the helper-fee suppression), then enrols. Returns true on success.
-function FarmHandManager:enrollSprayCourse(worker)
-    if worker == nil or worker:isEnrolled()
-        or worker:hasCertificate(FarmHandCertificate.PESTICIDES) then
+--- True if the farm can currently afford a course's tuition.
+function FarmHandManager:canAffordCourse(course)
+    if course == nil then
         return false
     end
-    if not self:canAffordSprayCourse() then
+    local balance = self:getFarmBalance()
+    return balance ~= nil and balance >= course.tuition
+end
+
+--- Charge a course's tuition and enrol the worker on it. Atomic: re-checks
+--- eligibility (doesn't already hold THAT cert, not enrolled in ANY course) +
+--- funds, deducts via the proven addMoney passthrough path (same guard payWages
+--- uses, so a mid-job enrolment isn't eaten by the helper-fee suppression), then
+--- enrols. Returns true on success.
+function FarmHandManager:enrollInCourse(worker, courseKey)
+    local course = self:getCourse(courseKey)
+    if worker == nil or course == nil then
+        return false
+    end
+    if worker:isEnrolled() or worker:hasCertificate(course.cert) then
+        return false
+    end
+    if not self:canAffordCourse(course) then
         return false
     end
 
@@ -649,11 +686,11 @@ function FarmHandManager:enrollSprayCourse(worker)
     end
 
     self.moneyPassthrough = true
-    g_currentMission:addMoney(-FarmHandManager.COLLEGE_SPRAY_TUITION, farm:getId(),
+    g_currentMission:addMoney(-course.tuition, farm:getId(),
         MoneyType.AI or MoneyType.WAGES or MoneyType.OTHER, true, true)
     self.moneyPassthrough = false
 
-    self:enrollCourse(worker, FarmHandCertificate.PESTICIDES, FarmHandManager.COLLEGE_SPRAY_MONTHS)
+    self:enrollCourse(worker, course.cert, course.months)
     return true
 end
 
