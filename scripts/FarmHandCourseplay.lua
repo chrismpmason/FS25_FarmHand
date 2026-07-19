@@ -39,6 +39,12 @@ FarmHandCourseplay = {}
 
 FarmHandCourseplay.installed = false
 
+-- Bring-up debug logging: start/tick/end lines carrying the numbers behind the
+-- behaviour (hand, operation, speed factor, gate state, live speed, hectares).
+-- On for the CP verification run; flip off once the path is confirmed in-game.
+FarmHandCourseplay.DEBUG = true
+FarmHandCourseplay.DEBUG_TICK_MS = 1000
+
 --- The field-work task's combination root vehicle, or nil. On CpAITaskFieldWork
 --- the vehicle is self.vehicle; FarmHandOperation.classify / the overrides / the
 --- accrual all accept it exactly as they accept a basegame root vehicle.
@@ -67,6 +73,22 @@ local function onFieldWorkStart(self, ...)
     end
 
     FarmHand.installJobBoost(self, vehicle, hand)
+
+    -- Debug: report the boost this job installed. classify()/boostFor() are cheap
+    -- and re-run once here purely for the log; installJobBoost above did the real
+    -- install. Seeds the per-tick throttle + the per-job hectare baseline too.
+    if FarmHandCourseplay.DEBUG then
+        local opClass, opDetail = FarmHandOperation.classify(vehicle)
+        local speedBoost, wearBoost = FarmHandOperation.boostFor(hand, opClass)
+        local tierFactor = manager:getTierSpeedFactor(hand)
+        local speedFactor = math.min(tierFactor * speedBoost, FarmHandSpeed.MAX_FACTOR)
+        self._farmHandCpStartHa = hand.hectaresWorked or 0
+        self._farmHandCpTickAccum = 0
+        print(string.format(
+            "FarmHand[CP] START: hand='%s' tier=%s op=%s (%s) tierFactor=%.2f speedBoost=%.2f -> speedFactor=%.2f wearBoost=%.2f",
+            tostring(hand.name), tostring(manager:getTier(hand)), tostring(opClass), tostring(opDetail),
+            tierFactor, speedBoost, speedFactor, wearBoost))
+    end
 end
 
 --- Appended to CpAITaskFieldWork:update. Runs every frame while the field-work
@@ -83,12 +105,45 @@ local function onFieldWorkUpdate(self, dt, ...)
     end
 
     FarmHandWorkDetector.accrue(vehicle, dt)
+
+    -- Debug: throttled (~1s) so the run gets the numbers behind the visual.
+    -- fieldWorkActive is the key diagnostic: it's the basegame getIsFieldWorkActive
+    -- our speed override gates on -- if it's true, the scaledSpeedLimit below is
+    -- already scaled by the hand's factor, so a Novice shows a lower ceiling.
+    if FarmHandCourseplay.DEBUG then
+        self._farmHandCpTickAccum = (self._farmHandCpTickAccum or 0) + dt
+        if self._farmHandCpTickAccum >= FarmHandCourseplay.DEBUG_TICK_MS then
+            self._farmHandCpTickAccum = 0
+            local manager = FarmHand.manager
+            local hand = manager ~= nil and manager:getActiveHand() or nil
+            local speedKmh = (vehicle.getLastSpeed ~= nil and vehicle:getLastSpeed()) or 0
+            local scaledLimit = (vehicle.getSpeedLimit ~= nil and vehicle:getSpeedLimit(true)) or -1
+            local fieldWorkActive = vehicle.getIsFieldWorkActive ~= nil and vehicle:getIsFieldWorkActive() or false
+            print(string.format(
+                "FarmHand[CP] tick: cpFieldWork=true fieldWorkActive=%s speed=%.1fkm/h scaledSpeedLimit=%.1fkm/h ha=%.3f",
+                tostring(fieldWorkActive), speedKmh, scaledLimit,
+                hand ~= nil and (hand.hectaresWorked or 0) or 0))
+        end
+    end
 end
 
 --- Appended to CpAITaskFieldWork:stop. Mirror onFieldWorkStart: tear down the
 --- overrides stashed on the task. Safe when nothing was installed.
 local function onFieldWorkStop(self, ...)
     FarmHand.teardownJobBoost(self)
+
+    -- Debug: confirm teardown ran and report the hectares this job credited.
+    if FarmHandCourseplay.DEBUG then
+        local manager = FarmHand.manager
+        local hand = manager ~= nil and manager:getActiveHand() or nil
+        local nowHa = hand ~= nil and (hand.hectaresWorked or 0) or 0
+        local jobHa = nowHa - (self._farmHandCpStartHa or nowHa)
+        print(string.format(
+            "FarmHand[CP] STOP: teardown done; this job credited %.3f ha (hand total %.3f)",
+            jobHa, nowHa))
+        self._farmHandCpStartHa = nil
+        self._farmHandCpTickAccum = nil
+    end
 end
 
 --- Install the Courseplay attach points. Idempotent, and a guarded no-op (with a
