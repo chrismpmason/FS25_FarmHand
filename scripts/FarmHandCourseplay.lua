@@ -88,6 +88,38 @@ local function onFieldWorkStart(self, ...)
 
     FarmHand.installJobBoost(self, vehicle, hand)
 
+    -- Gap 2 (Option A, task-level): make the cab driver the ACTIVE HAND. CpAIJob:start
+    -- has already built CP's own agent from a RANDOM helper (createAgent, before this
+    -- field-work task starts), so unlike the vanilla path we can't just set an index
+    -- and let a later createAgent pick it up -- we re-drive the identity: point the job
+    -- at the hand's registered helper (name + gender + style are all bundled on that one
+    -- helperIndex) and rebuild the agent so the visible driver becomes the hand.
+    -- Guarded: only when the hand has a registered helper index; if nil, we leave CP's
+    -- driver untouched rather than risk breaking the job. Accepts the drive-to-field lag
+    -- for v1 -- the driver swaps to the hand when field work begins (see file header /
+    -- Option A). NOTE: this runs AFTER CP's own assignment, so it sticks.
+    local idx = manager.getActiveHelperIndex and manager:getActiveHelperIndex() or nil
+    if idx ~= nil and self.job ~= nil
+        and vehicle.deleteAgent ~= nil and vehicle.createAgent ~= nil then
+
+        self.job.helperIndex = idx
+        vehicle:deleteAgent()
+        vehicle:createAgent(idx)
+        if vehicle.aiJobStarted ~= nil then
+            vehicle:aiJobStarted(self.job, idx, self.job.startedFarmId)
+        end
+
+        if FarmHandCourseplay.DEBUG then
+            print(string.format(
+                "FarmHand[CP] DRIVER: reassigned cab driver to active hand '%s' (helperIndex=%s, farmId=%s)",
+                tostring(hand.name), tostring(idx), tostring(self.job.startedFarmId)))
+        end
+    elseif FarmHandCourseplay.DEBUG then
+        print(string.format(
+            "FarmHand[CP] DRIVER: not reassigned (helperIndex=%s) -- leaving CP's driver as-is",
+            tostring(idx)))
+    end
+
     -- Debug: report the boost this job installed. classify()/boostFor() are cheap
     -- and re-run once here purely for the log; installJobBoost above did the real
     -- install. Seeds the per-tick throttle + the per-job hectare baseline too.
