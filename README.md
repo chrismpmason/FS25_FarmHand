@@ -40,6 +40,14 @@ Enrol a hand from the **College** tab. Each course charges a one-off tuition up 
 - **Spraying is a gate.** Applying herbicide needs the Spraying qualification — a hand without it can't be sent to spray weed killer. Fertilising, liquid fertilising and liming are open to any hand.
 - **The other four are boosts.** Any hand can harvest, sow, fertilise or do forage work untrained, but a hand who holds the matching qualification does that job **faster and with less machinery wear**. Training pays off on the operations you run most.
 
+## Courseplay
+FarmHand now works with **Courseplay** field jobs, not just the base-game helper. Start a CP field-work course with a hand active and that hand does the work: they **earn experience** (hectares worked), apply their **tier speed effect** and **wear behaviour**, and appear as the **named driver** in the cab — the same as a vanilla worker job.
+
+- **Speed on Courseplay — read this.** The tier **penalty** and the wear/experience effects apply fully on CP: a Novice really does drive a CP course slower, and every hand levels up and scales wear as usual. The certificate **speed bonus**, however, **defers to your Courseplay field-speed setting** — CP caps the vehicle at the speed you set, so a certified hand can't push past it. So a certified hand still helps (less wear, still earning experience) and is never *slower* for the cert, but CP's own speed setting, not the cert, sets the top speed. Raise CP's field speed if you want a certified hand to run faster.
+- **With a hand active, FarmHand governs the job** — including the gates. Sending a hand to spray **herbicide** on a CP job requires the **Spraying** qualification, exactly as on a vanilla job; an uncertified hand is refused before the job starts, with a message. Fertilising, liquid fertilising and liming stay open.
+- **With no hand active, FarmHand defers entirely** — the CP job runs untouched: no attribution, no speed/wear change, no gate. FarmHand only ever steps in when one of your hands is the one doing the work.
+- **AutoDrive is not integrated** in this build. AutoDrive handles transport driving rather than field work, so hands don't yet earn or gate on AD routes. Planned for a later build.
+
 ## Settings — the wear toggle
 FarmHand writes a settings file the first time you run it:
 
