@@ -82,6 +82,7 @@ local function onFieldWorkStart(self, ...)
         local speedBoost, wearBoost = FarmHandOperation.boostFor(hand, opClass)
         local tierFactor = manager:getTierSpeedFactor(hand)
         local speedFactor = math.min(tierFactor * speedBoost, FarmHandSpeed.MAX_FACTOR)
+        self._farmHandCpHand = hand -- captured so STOP reports the same hand even if the active hand clears on unload
         self._farmHandCpStartHa = hand.hectaresWorked or 0
         self._farmHandCpTickAccum = 0
         print(string.format(
@@ -132,15 +133,21 @@ end
 local function onFieldWorkStop(self, ...)
     FarmHand.teardownJobBoost(self)
 
-    -- Debug: confirm teardown ran and report the hectares this job credited.
+    -- Debug: confirm teardown ran and report the hectares this job credited to the
+    -- hand captured at START (not the current active hand, which is nil during a
+    -- mission unload and would otherwise show a bogus negative delta).
     if FarmHandCourseplay.DEBUG then
-        local manager = FarmHand.manager
-        local hand = manager ~= nil and manager:getActiveHand() or nil
-        local nowHa = hand ~= nil and (hand.hectaresWorked or 0) or 0
-        local jobHa = nowHa - (self._farmHandCpStartHa or nowHa)
-        print(string.format(
-            "FarmHand[CP] STOP: teardown done; this job credited %.3f ha (hand total %.3f)",
-            jobHa, nowHa))
+        local hand = self._farmHandCpHand
+        if hand ~= nil then
+            local nowHa = hand.hectaresWorked or 0
+            local jobHa = nowHa - (self._farmHandCpStartHa or nowHa)
+            print(string.format(
+                "FarmHand[CP] STOP: teardown done; '%s' credited %.3f ha this job (hand total %.3f)",
+                tostring(hand.name), jobHa, nowHa))
+        else
+            print("FarmHand[CP] STOP: teardown done (no hand captured at start).")
+        end
+        self._farmHandCpHand = nil
         self._farmHandCpStartHa = nil
         self._farmHandCpTickAccum = nil
     end
