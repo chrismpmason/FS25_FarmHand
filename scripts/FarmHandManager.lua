@@ -198,6 +198,11 @@ function FarmHandManager:saveToXMLFile(path)
         xmlFile:setInt(workerKey .. "#lastNotifiedTier", worker.lastNotifiedTier or self:getTier(worker))
         xmlFile:setInt(workerKey .. "#baseWage", worker.baseWage or 2000)
 
+        -- Per-month "did any work" flag. Persisted so course progress survives a
+        -- save/reload mid-month: without this the flag resets to false on load and
+        -- an enrolled hand's course never advances if the month rolls after a reload.
+        xmlFile:setBool(workerKey .. "#workedThisMonth", worker.workedThisMonth or false)
+
         -- Driver appearance slot + gender (helperIndex is runtime-only, not saved).
         if worker.styleSlot ~= nil then
             xmlFile:setInt(workerKey .. "#styleSlot", worker.styleSlot)
@@ -252,6 +257,8 @@ function FarmHandManager:loadFromXMLFile(path)
             -- hand's current tier so the update doesn't fire a spurious tier-up.
             worker.lastNotifiedTier = xmlFile:getInt(workerKey .. "#lastNotifiedTier", self:getTier(worker))
             worker.baseWage = xmlFile:getInt(workerKey .. "#baseWage", 2000)
+            -- Absent on pre-fix saves -> default false (clean load, no data loss).
+            worker.workedThisMonth = xmlFile:getBool(workerKey .. "#workedThisMonth", false)
             worker.styleSlot = xmlFile:getInt(workerKey .. "#styleSlot", nil)
             worker.isMale = xmlFile:getBool(workerKey .. "#isMale", true)
 
