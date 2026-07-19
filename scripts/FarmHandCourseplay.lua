@@ -167,9 +167,17 @@ function FarmHandCourseplay.install()
     -- The table it holds is the live class Courseplay instantiates from, so
     -- appending its methods is seen by every field-work task (CpObject late-binds).
     local cpEnv = FS25_Courseplay
-    local task = cpEnv ~= nil and cpEnv.CpAITaskFieldWork or nil
-    if task == nil or task.start == nil or task.update == nil or task.stop == nil then
-        print("FarmHand: Courseplay present but FS25_Courseplay.CpAITaskFieldWork start/update/stop not found - CP field-work attribution NOT installed.")
+    if cpEnv == nil then
+        print("FarmHand: Courseplay loaded but its mod-env table FS25_Courseplay is not reachable - CP field-work attribution NOT installed.")
+        return
+    end
+    local task = cpEnv.CpAITaskFieldWork
+    if task == nil then
+        print("FarmHand: FS25_Courseplay reachable but FS25_Courseplay.CpAITaskFieldWork is nil - CP field-work attribution NOT installed.")
+        return
+    end
+    if task.start == nil or task.update == nil or task.stop == nil then
+        print("FarmHand: CpAITaskFieldWork found but start/update/stop missing - CP field-work attribution NOT installed.")
         return
     end
 
