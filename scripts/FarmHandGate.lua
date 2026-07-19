@@ -134,6 +134,34 @@ local function checkPesticidesGate(vehicle)
     return true, nil
 end
 
+--- Courseplay variant of the pesticide gate. FarmHand asserts its rules on a CP
+--- job ONLY WHEN A HAND IS ACTIVE -- matching every other FarmHand/CP interaction
+--- (boost, experience, driver reassignment), which all key on an active hand. So,
+--- unlike checkPesticidesGate (the vanilla path), this deliberately does NOT refuse
+--- when no hand is selected: it defers entirely and CP runs untouched. Only the
+--- cert requirement for an active hand is shared. Exposed for FarmHandCourseplay.
+-- @return isValid, errorMessage
+function FarmHandGate.checkActiveHandPesticides(vehicle)
+    -- Not applying herbicide: nothing to gate.
+    if not combinationAppliesHerbicide(vehicle) then
+        return true, nil
+    end
+
+    -- No active hand: FarmHand defers on CP jobs -- CP sprays normally, no refusal.
+    local manager = FarmHand.manager
+    local hand = manager ~= nil and manager:getActiveHand() or nil
+    if hand == nil then
+        return true, nil
+    end
+
+    -- A hand is active and this is herbicide: it must hold the pesticides cert.
+    if not hand:hasCertificate(FarmHandCertificate.PESTICIDES) then
+        return false, string.format("%s isn't certified to handle pesticides.", hand.name)
+    end
+
+    return true, nil
+end
+
 --- Install the overwrite into AIJobFieldWork:validate. Idempotent.
 function FarmHandGate.install()
     if FarmHandGate.installed then

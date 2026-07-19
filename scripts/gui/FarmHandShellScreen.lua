@@ -440,9 +440,13 @@ function FarmHandShellScreen:refreshOverview()
         tiers[t] = (tiers[t] or 0) + 1
     end
 
+    -- "Working now" reads the shared working-state set (updated by BOTH the vanilla
+    -- and Courseplay paths), not farmHandJobCount -- that counter is vanilla-only
+    -- fee-suppression state and stays 0 for a CP job. workingCount is the set size;
+    -- the active hand's Working/Idle line asks whether that specific hand is working.
     local active = mgr ~= nil and mgr:getActiveHand() or nil
-    local isWorking = active ~= nil and (mgr.farmHandJobCount or 0) > 0
-    local workingCount = isWorking and 1 or 0
+    local workingCount = mgr ~= nil and mgr:getWorkingCount() or 0
+    local isWorking = active ~= nil and mgr:isHandWorking(active)
     local idleCount = headcount - workingCount
     local candidates = mgr ~= nil and #mgr.candidates or 0
 
