@@ -34,6 +34,20 @@
 -- Attribution follows the Option-A model (the active hand), the same as the
 -- basegame path; per-vehicle worker assignment arrives with multi-hand.
 --
+-- v1 speed split on Courseplay (confirmed in-game, Novice cultivate). CP resets
+-- its per-loop speed ceiling to vehicle:getSpeedLimit(true) each update, then
+-- min's in every constraint (its own field-speed setting, turns, proximity). Our
+-- FarmHandSpeed override wraps that getSpeedLimit, so:
+--   * the proficiency PENALTY lands -- a low-tier hand's scaled-down ceiling
+--     drops below CP's field speed and binds (Novice 0.6x seen driving ~9 km/h
+--     on a ~15 km/h cultivator); and
+--   * experience (hectares) and the wear scaling land fully, identical to the
+--     basegame path (shared accrue / installJobBoost).
+-- The cert speed BOOST, by contrast, usually does NOT show on CP: raising the
+-- ceiling above CP's own field-speed setting leaves that setting as the binding
+-- min. This is accepted for v1 -- the boost defers to CP's speed setting rather
+-- than forcing past it; the wear cert bonus still applies.
+--
 
 FarmHandCourseplay = {}
 
