@@ -46,7 +46,14 @@ FarmHand now works with **Courseplay** field jobs, not just the base-game helper
 - **Speed on Courseplay — read this.** The tier **penalty** and the wear/experience effects apply fully on CP: a Novice really does drive a CP course slower, and every hand levels up and scales wear as usual. The certificate **speed bonus**, however, **defers to your Courseplay field-speed setting** — CP caps the vehicle at the speed you set, so a certified hand can't push past it. So a certified hand still helps (less wear, still earning experience) and is never *slower* for the cert, but CP's own speed setting, not the cert, sets the top speed. Raise CP's field speed if you want a certified hand to run faster.
 - **With a hand active, FarmHand governs the job** — including the gates. Sending a hand to spray **herbicide** on a CP job requires the **Spraying** qualification, exactly as on a vanilla job; an uncertified hand is refused before the job starts, with a message. Fertilising, liquid fertilising and liming stay open.
 - **With no hand active, FarmHand defers entirely** — the CP job runs untouched: no attribution, no speed/wear change, no gate. FarmHand only ever steps in when one of your hands is the one doing the work.
-- **AutoDrive is not integrated** in this build. AutoDrive handles transport driving rather than field work, so hands don't yet earn or gate on AD routes. Planned for a later build.
+
+## AutoDrive
+FarmHand also works with **AutoDrive** transport tasks (carting, haulage). With a hand active, that hand is shown as the **driver** — their name on the AutoDrive HUD and their character (gender/style) in the cab — and they appear as **working** in the panel, instead of an anonymous helper.
+
+- **Identity and presence only.** Unlike Courseplay field work, AutoDrive is *not* a progression activity: hands earn **no experience** and get **no boost** from carting — carting doesn't build a hand, it just means your employed hand does the driving rather than a stranger. No certificate is required or gated on AutoDrive routes.
+- **With no hand active, AutoDrive is untouched** — it runs with its own helper exactly as it would without FarmHand.
+
+> **Run only one helper-manager mod.** FarmHand manages your hired workers directly (it drives the helpers, assigns the active hand, and pays the wage). Running it alongside another helper-management mod (for example **HiredHelperTool**) can stop a hand from starting a job. FarmHand logs a warning if it detects another such mod loaded — if a hand won't begin a job, disable the other helper manager and reload.
 
 ## Settings — the wear toggle
 FarmHand writes a settings file the first time you run it:
