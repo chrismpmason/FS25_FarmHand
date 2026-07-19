@@ -342,6 +342,31 @@ vehicle→hand assignment map, persisted (additive / save-safe).
 **Status:** parked pending build-2 (Scroft) feedback. Run the feasibility audit first when picked
 up.
 
+### Contractors tab (PARKED — build 3 candidate, pairs with multi-hand)
+
+Completes the labour spectrum: employ a hand (build — payroll, experience, the existing FarmHand
+model) vs contract a job (buy — pay a one-off total, job done, no commitment). Real UK farming:
+farms contract out operations rather than own kit/employ staff. Would be a 5th shell tab.
+
+Model (v1 direction):
+- Contractor uses the PLAYER'S machine (like vanilla AI), NOT their own kit (own-kit spawning is a
+  big future-only extension).
+- Pricing = per-hectare by operation × field area = one quoted TOTAL, shown before you commit.
+  Ground the £/ha rates in real UK NAAC contractor guide rates (same grounding approach as NMW
+  wages).
+- Pay the lump sum (on dispatch or completion — TBD), NO payroll, NO experience, NO certs. Always
+  competent (it's a paid service).
+- An AI worker does the field; the difference from a hired hand is the cost model (fixed quote,
+  not monthly salary).
+
+Economic decision it creates: one-off peak work (harvest) → contract in (pricey per-job, zero
+ongoing cost); ongoing work → employ a hand (cheaper over time, builds experience). Makes employed
+hands more meaningful by contrast.
+
+Open feasibility questions (verify READ-ONLY before building): can we charge a fixed fee for an AI
+job in place of the per-hour helper fee? can we read field area at quote time for the per-hectare
+price? is contractor-brings-own-kit feasible at all or hard-defer?
+
 ---
 
 ## 10. Panel UI: full-screen tabbed shell (PLANNED — build 2, before College)
