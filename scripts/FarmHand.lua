@@ -17,7 +17,7 @@ FarmHand = {}
 
 FarmHand.MOD_NAME = g_currentModName
 FarmHand.MOD_DIRECTORY = g_currentModDirectory
-FarmHand.VERSION = "0.3.0.0"
+FarmHand.VERSION = "0.3.1.0"
 
 -- Pull in the rest of the mod. Order matters: settings and the worker model are
 -- needed before the manager that uses them.
