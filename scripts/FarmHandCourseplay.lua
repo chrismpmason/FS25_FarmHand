@@ -160,18 +160,23 @@ function FarmHandCourseplay.install()
         return -- Courseplay not present: nothing to attach to, no message needed.
     end
 
-    if CpAITaskFieldWork == nil
-        or CpAITaskFieldWork.start == nil
-        or CpAITaskFieldWork.update == nil
-        or CpAITaskFieldWork.stop == nil then
-        print("FarmHand: Courseplay present but CpAITaskFieldWork start/update/stop not found - CP field-work attribution NOT installed.")
+    -- FS25 isolates each mod's Lua globals: another mod's classes are NOT visible
+    -- by bare name, only through the global table named after that mod's folder.
+    -- (Courseplay reaches AutoDrive the same way: `FS25_AutoDrive.AutoDrive`.) So a
+    -- bare `CpAITaskFieldWork` resolves to nil from here; go through FS25_Courseplay.
+    -- The table it holds is the live class Courseplay instantiates from, so
+    -- appending its methods is seen by every field-work task (CpObject late-binds).
+    local cpEnv = FS25_Courseplay
+    local task = cpEnv ~= nil and cpEnv.CpAITaskFieldWork or nil
+    if task == nil or task.start == nil or task.update == nil or task.stop == nil then
+        print("FarmHand: Courseplay present but FS25_Courseplay.CpAITaskFieldWork start/update/stop not found - CP field-work attribution NOT installed.")
         return
     end
 
-    CpAITaskFieldWork.start  = Utils.appendedFunction(CpAITaskFieldWork.start,  onFieldWorkStart)
-    CpAITaskFieldWork.update = Utils.appendedFunction(CpAITaskFieldWork.update, onFieldWorkUpdate)
-    CpAITaskFieldWork.stop   = Utils.appendedFunction(CpAITaskFieldWork.stop,   onFieldWorkStop)
+    task.start  = Utils.appendedFunction(task.start,  onFieldWorkStart)
+    task.update = Utils.appendedFunction(task.update, onFieldWorkUpdate)
+    task.stop   = Utils.appendedFunction(task.stop,   onFieldWorkStop)
 
     FarmHandCourseplay.installed = true
-    print("FarmHand: Courseplay field-work attribution installed on CpAITaskFieldWork (start/update/stop).")
+    print("FarmHand: Courseplay field-work attribution installed on FS25_Courseplay.CpAITaskFieldWork (start/update/stop).")
 end
