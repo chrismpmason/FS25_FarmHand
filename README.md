@@ -70,4 +70,4 @@ Edit the value, save the file, and restart the game (or reload a save) for it to
 - Is the hire → train → work → experience → wage → dismiss loop clear and worth using?
 - What's confusing or missing?
 
-Report to: [your channel here]
+Found a bug or have feedback? Open an issue: https://github.com/chrismpmason/FS25_FarmHand/issues
