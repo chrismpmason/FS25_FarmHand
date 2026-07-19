@@ -200,6 +200,34 @@ local function onFieldWorkStop(self, ...)
     end
 end
 
+--- Overwrite for CpAIJobFieldWork:validate -- the CP-side pesticide gate. CP's own
+--- validate runs FIRST; if CP refuses (no course, bad field, etc.) we pass that
+--- straight through. Only when CP would allow the job do we apply FarmHand's rule,
+--- and that rule keys on an active hand (FarmHandGate.checkActiveHandPesticides
+--- defers when none is), so an uncertified ACTIVE hand can't start a CP herbicide
+--- job while a hand-less CP job runs untouched. Mirrors the vanilla gate on
+--- AIJobFieldWork:validate; refusal returns (false, message), which CP surfaces
+--- (in-menu error text, and a blinking warning on the HUD start path). Every CP
+--- field-work start path validates before starting, so this closes them all.
+local function onFieldWorkValidate(self, superFunc, ...)
+    local isValid, errorMessage = superFunc(self, ...)
+    if not isValid then
+        return isValid, errorMessage -- CP already refused: leave its result intact.
+    end
+
+    local vehicle = self.vehicleParameter ~= nil and self.vehicleParameter:getVehicle() or nil
+    if vehicle == nil or FarmHandGate == nil or FarmHandGate.checkActiveHandPesticides == nil then
+        return isValid, errorMessage
+    end
+
+    local ok, gateMessage = FarmHandGate.checkActiveHandPesticides(vehicle)
+    if not ok then
+        return false, gateMessage
+    end
+
+    return isValid, errorMessage -- gate passed (or deferred): keep CP's valid result.
+end
+
 --- Install the Courseplay attach points. Idempotent, and a guarded no-op (with a
 --- log) when Courseplay isn't loaded or its expected class/methods aren't present,
 --- so a missing or restructured CP can never break FarmHand -- it simply doesn't
@@ -238,6 +266,20 @@ function FarmHandCourseplay.install()
     task.start  = Utils.appendedFunction(task.start,  onFieldWorkStart)
     task.update = Utils.appendedFunction(task.update, onFieldWorkUpdate)
     task.stop   = Utils.appendedFunction(task.stop,   onFieldWorkStop)
+
+    -- Pesticide gate: overwrite CpAIJobFieldWork:validate so an uncertified active
+    -- hand can't start a CP herbicide job (the vanilla gate on AIJobFieldWork:validate
+    -- never fires for CP -- CpAIJobFieldWork extends AIJob, not AIJobFieldWork). Its
+    -- own guarded block so a missing/renamed job class disables only the gate, not the
+    -- attribution above. validate is a CpObject method, late-bound through the class
+    -- table, so a mission-load overwrite is seen by every job instance at call time.
+    local fieldWorkJob = cpEnv.CpAIJobFieldWork
+    if fieldWorkJob == nil or fieldWorkJob.validate == nil then
+        print("FarmHand: FS25_Courseplay.CpAIJobFieldWork(:validate) not found - CP pesticide gate NOT installed.")
+    else
+        fieldWorkJob.validate = Utils.overwrittenFunction(fieldWorkJob.validate, onFieldWorkValidate)
+        print("FarmHand: Courseplay pesticide gate installed on FS25_Courseplay.CpAIJobFieldWork:validate.")
+    end
 
     FarmHandCourseplay.installed = true
     print("FarmHand: Courseplay field-work attribution installed on FS25_Courseplay.CpAITaskFieldWork (start/update/stop).")
