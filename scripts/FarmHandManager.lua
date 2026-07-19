@@ -117,6 +117,16 @@ function FarmHandManager.new(modDirectory, modName)
     self.farmHandJobCount = 0
     self.moneyPassthrough = false
 
+    -- Shared working-state set: which carriers (AI jobs / CP field-work tasks) are
+    -- currently doing FarmHand work, keyed by the carrier object -> {vehicle, hand}.
+    -- Updated by BOTH the vanilla and Courseplay paths (via installJobBoost /
+    -- teardownJobBoost), so it reflects a hand working regardless of who dispatched
+    -- the job. This is what the Overview reads. Kept deliberately separate from
+    -- farmHandJobCount above: that counter drives helper-fee suppression and stays
+    -- vanilla-only, so including CP here does NOT change CP fee behaviour. Keyed per
+    -- carrier (one entry per running job) so it also generalises to multi-hand.
+    self.workingCarriers = {}
+
     return self
 end
 
@@ -590,6 +600,56 @@ end
 function FarmHandManager:getActiveHelperIndex()
     local hand = self:getActiveHand()
     return hand ~= nil and hand.helperIndex or nil
+end
+
+-- =========================================================================
+-- Working-state set (which carriers are doing FarmHand work right now).
+-- Both the vanilla AI path and the Courseplay path funnel through
+-- installJobBoost / teardownJobBoost, so marking work here covers both. The
+-- Overview reads this; farmHandJobCount (fee suppression) is untouched.
+-- =========================================================================
+
+--- Mark `carrier` (an AI job or CP field-work task) as actively working
+--- `vehicle` with `hand`. Idempotent: re-marking the same carrier just refreshes
+--- the record. No-ops if carrier is nil.
+function FarmHandManager:markCarrierWorking(carrier, vehicle, hand)
+    if carrier == nil then
+        return
+    end
+    self.workingCarriers[carrier] = { vehicle = vehicle, hand = hand }
+end
+
+--- Clear `carrier` from the working set (its job ended). Safe if it was never
+--- marked or carrier is nil.
+function FarmHandManager:markCarrierIdle(carrier)
+    if carrier == nil then
+        return
+    end
+    self.workingCarriers[carrier] = nil
+end
+
+--- How many carriers are working right now (the working set's size). Overview's
+--- "N working" reads this, so a CP job counts exactly like a vanilla one.
+function FarmHandManager:getWorkingCount()
+    local n = 0
+    for _ in pairs(self.workingCarriers) do
+        n = n + 1
+    end
+    return n
+end
+
+--- Whether `hand` is the hand on any currently-working carrier. Drives the
+--- Active-hand "Working/Idle" line so it's correct during CP jobs too.
+function FarmHandManager:isHandWorking(hand)
+    if hand == nil then
+        return false
+    end
+    for _, entry in pairs(self.workingCarriers) do
+        if entry.hand == hand then
+            return true
+        end
+    end
+    return false
 end
 
 -- =========================================================================

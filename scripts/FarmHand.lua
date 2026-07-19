@@ -179,6 +179,12 @@ function FarmHand.installJobBoost(carrier, rootVehicle, hand)
     -- Proficiency -> speed: lower-tier hands work the field slower; a matching
     -- cert boosts it (scales the root's getSpeedLimit on working passes only).
     carrier._farmHandSpeedVehicles = FarmHandSpeed.applyOverride(rootVehicle, hand, manager, speedBoost)
+
+    -- Record this carrier in the shared working-state set. Both the vanilla and
+    -- Courseplay paths reach installJobBoost, so this is the one place that marks
+    -- "a hand is working" for the Overview -- independent of farmHandJobCount
+    -- (fee suppression), which stays vanilla-only.
+    manager:markCarrierWorking(carrier, rootVehicle, hand)
 end
 
 --- Reverse FarmHand.installJobBoost: restore the ADS and speed overrides stashed
@@ -188,6 +194,14 @@ end
 function FarmHand.teardownJobBoost(carrier)
     if carrier == nil then
         return
+    end
+
+    -- Clear this carrier from the shared working-state set (mirror of the mark in
+    -- installJobBoost). Both the vanilla job-end hook and the CP task-stop hook
+    -- reach here, so the Overview returns to idle whichever path ran the job.
+    local manager = FarmHand.manager
+    if manager ~= nil then
+        manager:markCarrierIdle(carrier)
     end
 
     -- Restore the ADS per-instance overrides installed for this job's vehicles.
