@@ -30,6 +30,7 @@ local sourceFiles = {
     "scripts/FarmHandWear.lua",
     "scripts/FarmHandSpeed.lua",
     "scripts/FarmHandOperation.lua",
+    "scripts/FarmHandCourseplay.lua",
     -- The legacy K dialog (FarmHandsDialog) was replaced by the full-screen shell
     -- in build 2 and its files have now been removed.
     "scripts/gui/FarmHandShellScreen.lua",
@@ -73,6 +74,13 @@ function FarmHand:onMissionLoad(mission)
     -- Suppress the vanilla per-job helper fee while a FarmHand does the work, so
     -- the monthly salary is the only labour cost. Hooks this mission's addMoney.
     FarmHand.installAddMoneyHook()
+
+    -- Attribute Courseplay field-work jobs to the active hand too (boost +
+    -- experience), via a parallel attach point on CP's own field-work task. A
+    -- guarded no-op when Courseplay isn't loaded. Installed here (not at script
+    -- load) so CP's classes are reliably defined; CpAITaskFieldWork is a CpObject
+    -- task class, late-bound, so mission-load wrapping is seen by later tasks.
+    FarmHandCourseplay.install()
 
     -- Detect ADS at mission start (reliable by runtime, unlike mod load order: ADS
     -- finalizes vehicle types before FarmHand even loads). The AI-job hooks use
@@ -128,31 +136,76 @@ function FarmHand.onAIJobStart(self, farmId, ...)
         self.farmHandCounted = true
         manager.farmHandJobCount = (manager.farmHandJobCount or 0) + 1
 
+        -- Operation detection -> cert-gated speed/wear boost for the active hand,
+        -- with teardown state stashed on the job. Shared with the Courseplay
+        -- attach point (FarmHandCourseplay), which stashes on the CP field-work
+        -- task instead — see FarmHand.installJobBoost.
         local rootVehicle = FarmHand.getJobRootVehicle(self)
+        FarmHand.installJobBoost(self, rootVehicle, hand)
+    end
+end
 
-        -- Operation detection -> cert-gated boost: if the active hand holds the cert
-        -- matching this operation, scale speed UP / wear DOWN on top of the tier
-        -- factor. Spray is a GATE (FarmHandGate), not a boost.
-        local opClass = FarmHandOperation.classify(rootVehicle)
-        local speedBoost, wearBoost = FarmHandOperation.boostFor(hand, opClass)
+--- Install the per-operation boost + speed/wear overrides for `hand` on
+--- `rootVehicle`, stashing the teardown handles on `carrier`. The carrier is the
+--- object whose end signal reverses it: the AI job for basegame helpers, the CP
+--- field-work task for Courseplay. Reused by both paths so boost behaviour is
+--- identical regardless of who dispatched the work. Safe to call once per carrier.
+function FarmHand.installJobBoost(carrier, rootVehicle, hand)
+    local manager = FarmHand.manager
+    if manager == nil or carrier == nil or hand == nil then
+        return
+    end
 
-        -- The vanilla (non-ADS) per-tick wear path reads the boost off the hand; the
-        -- ADS + speed overrides take it as a param. Cleared at job end.
-        hand._opWearBoost = wearBoost
-        self._farmHandBoostHand = hand
+    -- Operation detection -> cert-gated boost: if the active hand holds the cert
+    -- matching this operation, scale speed UP / wear DOWN on top of the tier
+    -- factor. Spray is a GATE (FarmHandGate), not a boost.
+    local opClass = FarmHandOperation.classify(rootVehicle)
+    local speedBoost, wearBoost = FarmHandOperation.boostFor(hand, opClass)
 
-        -- ADS path: scale this hand's vehicles' wear with a per-instance override
-        -- (removed at job end). Instance-field shadowing is independent of the
-        -- load/finalize order that defeats a class-level wrap. Skipped entirely when
-        -- the experience-wear setting is off (ADS then behaves exactly as vanilla).
-        if FarmHandWear.adsPresent and manager.settings:getExperienceWearEnabled() then
-            self._farmHandAdsVehicles =
-                FarmHandWear.applyADSOverride(rootVehicle, hand, manager.settings, wearBoost)
-        end
+    -- The vanilla (non-ADS) per-tick wear path reads the boost off the hand; the
+    -- ADS + speed overrides take it as a param. Cleared at job end.
+    hand._opWearBoost = wearBoost
+    carrier._farmHandBoostHand = hand
 
-        -- Proficiency -> speed: lower-tier hands work the field slower; a matching
-        -- cert boosts it (scales the root's getSpeedLimit on working passes only).
-        self._farmHandSpeedVehicles = FarmHandSpeed.applyOverride(rootVehicle, hand, manager, speedBoost)
+    -- ADS path: scale this hand's vehicles' wear with a per-instance override
+    -- (removed at job end). Instance-field shadowing is independent of the
+    -- load/finalize order that defeats a class-level wrap. Skipped entirely when
+    -- the experience-wear setting is off (ADS then behaves exactly as vanilla).
+    if FarmHandWear.adsPresent and manager.settings:getExperienceWearEnabled() then
+        carrier._farmHandAdsVehicles =
+            FarmHandWear.applyADSOverride(rootVehicle, hand, manager.settings, wearBoost)
+    end
+
+    -- Proficiency -> speed: lower-tier hands work the field slower; a matching
+    -- cert boosts it (scales the root's getSpeedLimit on working passes only).
+    carrier._farmHandSpeedVehicles = FarmHandSpeed.applyOverride(rootVehicle, hand, manager, speedBoost)
+end
+
+--- Reverse FarmHand.installJobBoost: restore the ADS and speed overrides stashed
+--- on `carrier` and clear the hand's per-operation wear boost. Safe when nothing
+--- was installed. Shared by the basegame job-end hook and the Courseplay task-stop
+--- hook.
+function FarmHand.teardownJobBoost(carrier)
+    if carrier == nil then
+        return
+    end
+
+    -- Restore the ADS per-instance overrides installed for this job's vehicles.
+    if carrier._farmHandAdsVehicles ~= nil then
+        FarmHandWear.removeADSOverride(carrier._farmHandAdsVehicles)
+        carrier._farmHandAdsVehicles = nil
+    end
+
+    -- Restore the getSpeedLimit overrides installed for this job's vehicles.
+    if carrier._farmHandSpeedVehicles ~= nil then
+        FarmHandSpeed.removeOverride(carrier._farmHandSpeedVehicles)
+        carrier._farmHandSpeedVehicles = nil
+    end
+
+    -- Clear the per-tick wear boost stashed on the hand for this job.
+    if carrier._farmHandBoostHand ~= nil then
+        carrier._farmHandBoostHand._opWearBoost = nil
+        carrier._farmHandBoostHand = nil
     end
 end
 
@@ -170,23 +223,9 @@ function FarmHand.onAIJobEnd(self, ...)
         manager.farmHandJobCount = math.max(0, (manager.farmHandJobCount or 0) - 1)
     end
 
-    -- Restore the ADS per-instance overrides installed for this job's vehicles.
-    if self._farmHandAdsVehicles ~= nil then
-        FarmHandWear.removeADSOverride(self._farmHandAdsVehicles)
-        self._farmHandAdsVehicles = nil
-    end
-
-    -- Restore the getSpeedLimit overrides installed for this job's vehicles.
-    if self._farmHandSpeedVehicles ~= nil then
-        FarmHandSpeed.removeOverride(self._farmHandSpeedVehicles)
-        self._farmHandSpeedVehicles = nil
-    end
-
-    -- Clear the per-tick wear boost stashed on the hand for this job.
-    if self._farmHandBoostHand ~= nil then
-        self._farmHandBoostHand._opWearBoost = nil
-        self._farmHandBoostHand = nil
-    end
+    -- Restore the boost/speed/wear overrides installed at job start (shared with
+    -- the Courseplay task-stop path).
+    FarmHand.teardownJobBoost(self)
 end
 
 --- Best-effort extraction of an AI job's root vehicle (the combination to scale

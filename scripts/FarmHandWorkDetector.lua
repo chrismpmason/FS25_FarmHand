@@ -95,13 +95,13 @@ local function getWorkWidth(vehicle)
     return vehicle.farmHandWidthCache, vehicle.farmHandWidthCacheSrc
 end
 
---- Appended to AIFieldWorker.updateAIFieldWorker. Runs per frame for every
---- AI-capable vehicle; we only act when it is actively field-working.
-local function onUpdateAIFieldWorker(self, dt)
-    if self.getIsFieldWorkActive == nil or not self:getIsFieldWorkActive() then
-        return
-    end
-
+--- Accrue one tick of field work to the active hand for `vehicle`: swept
+--- hectares + the worked-this-month flag, plus the vanilla wear rescale when ADS
+--- isn't the damage owner. Shared by the basegame updateAIFieldWorker hook and
+--- the Courseplay per-tick hook; each gates "is this vehicle actively field
+--- working" in its own way (basegame getIsFieldWorkActive / CP
+--- getIsCpFieldWorkActive) BEFORE calling here. No-op with no active hand.
+function FarmHandWorkDetector.accrue(vehicle, dt)
     local manager = FarmHand.manager
     local hand = manager ~= nil and manager:getActiveHand() or nil
     if hand == nil then
@@ -109,9 +109,9 @@ local function onUpdateAIFieldWorker(self, dt)
     end
 
     -- Swept area this tick = width x distance. getLastSpeed() is km/h.
-    local speedKmh = (self.getLastSpeed ~= nil and self:getLastSpeed()) or 0
+    local speedKmh = (vehicle.getLastSpeed ~= nil and vehicle:getLastSpeed()) or 0
     local distM = (speedKmh / 3.6) * (dt / 1000)
-    local width = getWorkWidth(self)
+    local width = getWorkWidth(vehicle)
     local deltaHa = (width * distM) / 10000
 
     -- Attribution: accumulate the delta and flag the month worked.
@@ -122,8 +122,17 @@ local function onUpdateAIFieldWorker(self, dt)
     -- override (installed at job start) does the scaling, so write no vanilla
     -- wear here. Otherwise rescale vanilla wear directly.
     if not FarmHandWear.adsPresent and manager.settings:getExperienceWearEnabled() then
-        FarmHandWear.applyToCombination(self, hand, manager.settings)
+        FarmHandWear.applyToCombination(vehicle, hand, manager.settings)
     end
+end
+
+--- Appended to AIFieldWorker.updateAIFieldWorker. Runs per frame for every
+--- AI-capable vehicle; we only act when it is actively field-working.
+local function onUpdateAIFieldWorker(self, dt)
+    if self.getIsFieldWorkActive == nil or not self:getIsFieldWorkActive() then
+        return
+    end
+    FarmHandWorkDetector.accrue(self, dt)
 end
 
 --- Install the hook. Idempotent.
