@@ -31,6 +31,7 @@ local sourceFiles = {
     "scripts/FarmHandSpeed.lua",
     "scripts/FarmHandOperation.lua",
     "scripts/FarmHandCourseplay.lua",
+    "scripts/FarmHandAutoDrive.lua",
     -- The legacy K dialog (FarmHandsDialog) was replaced by the full-screen shell
     -- in build 2 and its files have now been removed.
     "scripts/gui/FarmHandShellScreen.lua",
@@ -81,6 +82,12 @@ function FarmHand:onMissionLoad(mission)
     -- load) so CP's classes are reliably defined; CpAITaskFieldWork is a CpObject
     -- task class, late-bound, so mission-load wrapping is seen by later tasks.
     FarmHandCourseplay.install()
+
+    -- Give AutoDrive transport tasks the active hand's identity + presence (driver
+    -- character + HUD name, and shows as working) -- identity ONLY, no progression. A
+    -- guarded no-op when AutoDrive isn't loaded. Installed here (not at script load) so
+    -- AD's spec class is reliably defined; reached via the FS25_AutoDrive env table.
+    FarmHandAutoDrive.install()
 
     -- Detect ADS at mission start (reliable by runtime, unlike mod load order: ADS
     -- finalizes vehicle types before FarmHand even loads). The AI-job hooks use
