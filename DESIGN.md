@@ -315,6 +315,33 @@ The single-hand-to-master arc is the core. The roster is the scale layer. They c
 Balance follows from treating the single hand as the spine: it sets how fast proficiency
 should climb and whether to cap how many top tickets one hand can hold.
 
+### Multi-hand — simultaneous workers (PARKED — build 3 candidate)
+
+**Problem.** The mod is single-active-hand — only one hand works at a time, so a roster of three
+is pointless (one worker, two ornaments). The point of a workforce is using it.
+
+**Proposed direction — an ASSIGNMENT model.** Assign a hand to a vehicle; when that vehicle's AI
+job runs, all work (experience, boost, gate, tier) attributes to THAT hand. N vehicles out = N
+hands working, each earning their own XP, each boosted by their own certs. Makes hiring and
+training matter.
+
+**Scope reality.** Architectural, not a toggle. `getActiveHand()` is what everything keys off —
+experience accrual, the speed/wear overrides, the operation boost, the spray gate, the work
+detector. Multi-hand changes the thing the whole mod hangs off: build-3 cornerstone work.
+
+**Crux to verify first (read-only audit, not yet done).** Do FarmHand's AI hooks (`onAIJobStart`,
+`AIFieldWorker.updateAIFieldWorker`) fire PER-VEHICLE independently, with the vehicle identifiable
+each time? If yes, the change is mostly attribution — look up "the hand assigned to THIS vehicle"
+instead of the single active hand — a refactor. If the engine only exposes one helper context at a
+time, it is a wall. That audit decides refactor-vs-wall.
+
+**Knock-on.** The "active hand" concept (UI highlight, Overview "working now", the set-active
+toggle) becomes "assigned to a vehicle" (possibly several) — needs rethinking. New state: a
+vehicle→hand assignment map, persisted (additive / save-safe).
+
+**Status:** parked pending build-2 (Scroft) feedback. Run the feasibility audit first when picked
+up.
+
 ---
 
 ## 10. Panel UI: full-screen tabbed shell (PLANNED — build 2, before College)
