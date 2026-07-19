@@ -120,39 +120,23 @@ function FarmHandManager.new(modDirectory, modName)
     return self
 end
 
---- Bring the manager online for a loaded savegame. Restore persisted state if a
---- save file exists; otherwise seed the default roster (new game).
+--- Bring the manager online for a loaded savegame. Restore the persisted roster
+--- if this savegame has a save file; a brand-new game has none, so it starts with
+--- an EMPTY roster and the player hires their own hands from the pool below.
 function FarmHandManager:load()
     self.settings:load()
 
-    local loaded = self:loadFromXMLFile(self:getSavePath())
-    if loaded == nil then
-        self:seedDefaultRoster()
-    end
+    -- Load returns nil on a fresh game (no save file). We intentionally do NOT
+    -- seed a starter roster: a new game begins empty. Existing saves are read back
+    -- here unchanged, so their rosters load exactly as saved.
+    self:loadFromXMLFile(self:getSavePath())
 
     -- Register a per-hand helper (driver appearance + name) for the whole roster.
     self:registerHelpersForRoster()
 
     -- Seed the hire pool (runtime-only; regenerated monthly via refreshCandidates).
+    -- Always runs, so even an empty new-game roster has candidates to hire from.
     self:generateCandidates()
-end
-
---- Seed the default roster for a brand-new game (no save yet). TEMPORARY test
---- scaffolding until real hiring lands:
----   * Alan Carter - certified veteran (control).
----   * Tom Hale    - green, enrolled on the 3-month pesticides course (subject).
-function FarmHandManager:seedDefaultRoster()
-    local certified = FarmHandWorker.new("test_certified", "Alan Carter")
-    certified:grantCertificate(FarmHandCertificate.PESTICIDES)
-    certified.hectaresWorked = 500 -- veteran: wear multiplier ~0.9x
-    certified.isMale = true
-    self:addWorker(certified)
-
-    local rookie = FarmHandWorker.new("test_rookie", "Tom Hale")
-    rookie.hectaresWorked = 0 -- green: wear multiplier ~1.75x
-    rookie.isMale = true
-    self:addWorker(rookie)
-    self:enrollCourse(rookie, FarmHandCertificate.PESTICIDES, 3)
 end
 
 --- Release anything held for the current game.

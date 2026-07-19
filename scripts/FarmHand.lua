@@ -17,7 +17,7 @@ FarmHand = {}
 
 FarmHand.MOD_NAME = g_currentModName
 FarmHand.MOD_DIRECTORY = g_currentModDirectory
-FarmHand.VERSION = "0.1.0.0"
+FarmHand.VERSION = "0.3.0.0"
 
 -- Pull in the rest of the mod. Order matters: settings and the worker model are
 -- needed before the manager that uses them.
@@ -30,9 +30,8 @@ local sourceFiles = {
     "scripts/FarmHandWear.lua",
     "scripts/FarmHandSpeed.lua",
     "scripts/FarmHandOperation.lua",
-    -- FarmHandsDialog (the legacy K dialog) is RETIRED: the shell replaced it in
-    -- build 2. Its files are kept one version as a fallback but are no longer
-    -- sourced/registered. Re-add this line + register()/a key to revive it.
+    -- The legacy K dialog (FarmHandsDialog) was replaced by the full-screen shell
+    -- in build 2 and its files have now been removed.
     "scripts/gui/FarmHandShellScreen.lua",
 }
 
@@ -62,7 +61,6 @@ function FarmHand:onMissionLoad(mission)
     FarmHandGate.install()
 
     -- Load the Farm Hands panel GUI: the full-screen shell, opened on K.
-    -- (The legacy FarmHandsDialog is retired and no longer registered.)
     FarmHandShellScreen.register()
 
     -- Bind the open-panel key. Done here (not at script load) because the

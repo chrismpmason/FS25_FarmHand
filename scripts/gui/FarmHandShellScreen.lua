@@ -14,7 +14,7 @@
 
 FarmHandShellScreen = {}
 
--- Install-once guard for the GUI load (a real boolean; see FarmHandsDialog note).
+-- Install-once guard for the GUI load.
 FarmHandShellScreen.guiLoaded = false
 FarmHandShellScreen.INSTANCE = nil
 
