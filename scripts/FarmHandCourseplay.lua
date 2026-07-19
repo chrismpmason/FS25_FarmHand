@@ -53,10 +53,11 @@ FarmHandCourseplay = {}
 
 FarmHandCourseplay.installed = false
 
--- Bring-up debug logging: start/tick/end lines carrying the numbers behind the
--- behaviour (hand, operation, speed factor, gate state, live speed, hectares).
--- On for the CP verification run; flip off once the path is confirmed in-game.
-FarmHandCourseplay.DEBUG = true
+-- Bring-up debug logging: start/tick/end/driver lines carrying the numbers behind
+-- the behaviour (hand, operation, speed factor, gate state, live speed, hectares,
+-- driver reassignment). Off now the CP path is confirmed in-game; flip true to
+-- re-diagnose. The "attribution installed" info log in install() stays on regardless.
+FarmHandCourseplay.DEBUG = false
 FarmHandCourseplay.DEBUG_TICK_MS = 1000
 
 --- The field-work task's combination root vehicle, or nil. On CpAITaskFieldWork
